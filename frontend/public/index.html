@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuideX | Decentralized Mentorship</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/3.5.0/remixicon.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <span class="logo-icon">🧠</span>
+                GuideX
+            </div>
+            <nav id="nav-menu">
+                <a href="#home"><i class="ri-home-line"></i> Home</a>
+                <a href="#profiles"><i class="ri-user-search-line"></i> Explore Profiles</a>
+                <a href="#about"><i class="ri-information-line"></i> About</a>
+                <a href="#contact-us"><i class="ri-mail-line"></i> Contact Us</a>
+                <a href="signup.html" id="signUpBtn"><i class="ri-user-add-line"></i> Sign Up</a>
+                <a href="login.html" id="loginBtn"><i class="ri-login-box-line"></i> Login</a>
+                <div id="profileDropdown" class="profile-dropdown" style="display: none;" >
+                    <div id="profileCircle" class="profile-circle"></div>
+                    <div class="dropdown-content">
+                        <a href="profile.html">View Profile</a>
+                        <a href="#" id="logoutBtn">Logout</a>
+                    </div>
+                </div>
+                <button id="connectWallet"><i class="ri-wallet-line"></i> Connect Wallet</button>
+            </nav>
+            <button class="nav-toggle" id="nav-toggle">
+                <i class="ri-menu-line"></i>
+            </button>
+        </div>
+    </header>
+
+    <section id="home">
+        <section class="hero" id="hero">
+            <h1>Share Expertise, Earn NFTs</h1>
+            <p>Find the perfect mentor or expert, and reward them with unique NFT tokens for their guidance.</p>
+            <div class="cta-buttons">
+                <a href="#" class="button button-primary">Find a Mentor</a>
+                <a href="#" class="button button-secondary">Offer Guidance</a>
+            </div>
+        </section>
+
+        <section id="features" class="features-section">
+            <div class="features-container">
+                <div class="section-header">
+                    <h2>Why Choose Us</h2>
+                    <p class="section-subtitle">Discover the benefits of our platform</p>
+                </div>
+
+                <div class="features-grid">
+                    <!-- Feature Cards -->
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <span class="icon-circle">🌐</span>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Global Network</h3>
+                            <p>Connect with professionals, mentors, and experts worldwide for invaluable insights and guidance.</p>
+                        </div>
+                        <div class="feature-footer">
+                            <a href="#" class="learn-more">Learn More →</a>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <span class="icon-circle">🏆</span>
+                        </div>
+                        <div class="feature-content">
+                            <h3>NFT Rewards</h3>
+                            <p>Earn and collect unique NFT tokens as recognition for your mentorship contributions.</p>
+                        </div>
+                        <div class="feature-footer">
+                            <a href="#" class="learn-more">Learn More →</a>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <span class="icon-circle">👥</span>
+                        </div>
+                        <div class="feature-content">
+                            <h3>Personalized Sessions</h3>
+                            <p>Experience tailored one-on-one guidance sessions focused on your specific goals and needs.</p>
+                        </div>
+                        <div class="feature-footer">
+                            <a href="#" class="learn-more">Learn More →</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tiers" class="tier-system">
+            <div class="tier-container">
+                <h2>Tier-Based Profile System</h2>
+                <div class="tiers">
+                    <div class="tier copper">
+                        <div class="tier-icon">🔶</div>
+                        <h3>Copper</h3>
+                        <p>Taking the first steps</p>
+                    </div>
+                    <div class="tier bronze">
+                        <div class="tier-icon">🥉</div>
+                        <h3>Bronze</h3>
+                        <p>Building foundations</p>
+                    </div>
+                    <div class="tier silver">
+                        <div class="tier-icon">🥈</div>
+                        <h3>Silver</h3>
+                        <p>Gaining momentum</p>
+                    </div>
+                    <div class="tier gold">
+                        <div class="tier-icon">🥇</div>
+                        <h3>Gold</h3>
+                        <p>Mastering skills</p>
+                    </div>
+                    <div class="tier platinum">
+                        <div class="tier-icon">💎</div>
+                        <h3>Platinum</h3>
+                        <p>Setting standards</p>
+                    </div>
+                    <div class="tier titanium">
+                        <div class="tier-icon">🏆</div>
+                        <h3>Titanium</h3>
+                        <p>Breaking barriers</p>
+                    </div>
+                    <div class="tier legendary">
+                        <div class="tier-icon">👑</div>
+                        <h3>Legendary</h3>
+                        <p>Redefining excellence</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="profiles" class="profiles-section">
+            <h2>Expert Profiles</h2>
+            <div class="search-container">
+                <input type="text" id="profileSearch" placeholder="Search profiles...">
+            </div>
+
+            <div class="categories">
+                <button class="category-btn active" data-category="all">All Profiles</button>
+                <button class="category-btn" data-category="web-development">Web Development</button>
+                <button class="category-btn" data-category="artificial-intelligence">Artificial Intelligence</button>
+                <button class="category-btn" data-category="data-structures">Data Structures & Algorithms</button>
+                <button class="category-btn" data-category="app-development">App Development</button>
+            </div>
+            <div class="profiles-container" id="profilesContainer">
+                <!-- Profiles will be dynamically added here -->
+            </div>
+        </section>
+
+        <section id="about" class="about-section">
+            <div class="about-container">
+                <div class="about-content">
+                    <h2 class="section-title">About GuideX</h2>
+                    <p class="about-description">GuideX is a revolutionary platform that connects mentors and mentees through the power of blockchain technology. Our mission is to create a global network of knowledge sharing, where expertise is rewarded and learning is accessible to all.</p>
+                    <ul class="about-features">
+                        <li class="feature-item">
+                            <span class="feature-icon">🌐</span>
+                            <h3 class="feature-title">Global Network</h3>
+                            <p class="feature-description">Connect with experts worldwide</p>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-icon">🔗</span>
+                            <h3 class="feature-title">Blockchain-Verified</h3>
+                            <p class="feature-description">Secure, trustworthy credentials</p>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-icon">🏆</span>
+                            <h3 class="feature-title">NFT Rewards</h3>
+                            <p class="feature-description">Earn as you learn</p>
+                        </li>
+                    </ul>
+                </div>
+                <div class="about-image">
+                    <img src="assets/images/about-us.jpg" alt="About Us">
+                </div>
+            </div>
+        </section>
+    </section>
+
+    <footer>
+        <div class="footer-container">
+            <p>&copy; 2024 GuideX. All rights reserved. | <a href="privacy.html">Privacy Policy</a></p>
+        </div>
+    </footer>
+
+      
+    
+       <script src="assets/js/main.js"></script>
+       <script src="/js/profile-circle.js"></script>
+        <script src="/js/profile-dropdown.js"></script>
+       <script>
+        // connect wallet''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+document.addEventListener('DOMContentLoaded', () => {
+    const connectButton = document.getElementById('connectWallet');
+    const walletAddressElement = document.getElementById('walletAddress');
+
+    // Function to connect to MetaMask wallet
+    async function connectWallet() {
+        // Check if MetaMask (or any Ethereum wallet) is installed
+        if (typeof window.ethereum !== 'undefined') {
+            try {
+                // Request wallet connection
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const account = accounts[0];
+                
+                // Display connected wallet address
+                walletAddressElement.textContent = `Connected Wallet: ${account}`;
+                console.log('Connected account:', account);
+
+                // Optionally, you can listen for account changes
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    walletAddressElement.textContent = `Connected Wallet: ${accounts[0]}`;
+                });
+
+            } catch (error) {
+                console.error('Error connecting to MetaMask:', error);
+            }
+        } else {
+            alert('MetaMask is not installed. Please install MetaMask and try again.');
+        }
+    }
+
+    // Add click event listener to the button
+    connectButton.addEventListener('click', connectWallet);
+});
+
+
+
+
+
+
+
+
+
+
+
+       </script>
+</body>
+
+</html>

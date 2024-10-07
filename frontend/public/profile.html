@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - GuideX</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/3.5.0/remixicon.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <style>
+        .profile-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .profile-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .profile-picture {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+        .profile-name {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .profile-info {
+            margin-top: 20px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <!-- Include your header content here -->
+    </header>
+
+    <div class="profile-container">
+        <div class="profile-header">
+            <img src="assets/images/hero.jpg" alt="Profile Picture" class="profile-picture" id="profilePicture">
+            <h1 class="profile-name" id="profileName"></h1>
+        </div>
+        <div class="profile-info">
+            <div class="info-item">
+                <span class="info-label">Email:</span>
+                <span id="profileEmail"></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Tier:</span>
+                <span id="profileTier"></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Skills:</span>
+                <span id="profileSkills"></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Experience:</span>
+                <span id="profileExperience"></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Bio:</span>
+                <p id="profileBio"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/profile.js"></script>
+</body>
+</html>
