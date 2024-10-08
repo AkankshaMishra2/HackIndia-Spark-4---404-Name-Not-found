@@ -34,11 +34,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'copper'
   },
-  wallet: {
-    type: Number,
-    default: 0
+  walletAddress: {
+    type: String,
+    unique: true,
+    sparse: true
   }
-}, 
+},
+ 
 {
   timestamps: true // Adds createdAt and updatedAt timestamps
 });

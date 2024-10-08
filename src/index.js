@@ -267,6 +267,7 @@ app.get('/chat', (req, res, next) => {
     res.status(401).json({ message: "Unauthorized" });
   }
 });
+
 // New route to get chat history
 app.get('/api/chat-history', isAuthenticated, async (req, res) => {
   const { userId, otherUserId } = req.query;
@@ -285,6 +286,27 @@ app.get('/api/chat-history', isAuthenticated, async (req, res) => {
     console.error('Error fetching chat history:', error);
     res.status(500).json({ message: "Error fetching chat history" });
   }
+});
+
+// New route to update wallet balance
+app.post('/api/update-wallet', isAuthenticated, async (req, res) => {
+    const { userId, amount } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Convert amount to a number and add it to the current wallet balance
+        user.wallet += parseFloat(amount);
+        await user.save();
+
+        res.json({ message: "Wallet balance updated successfully", newBalance: user.wallet });
+    } catch (error) {
+        console.error('Error updating wallet balance:', error);
+        res.status(500).json({ message: "Error updating wallet balance", error: error.message });
+    }
 });
 
 // Catch-all route to serve the frontend for any other requests
