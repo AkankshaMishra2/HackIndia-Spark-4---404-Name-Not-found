@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Transfer</title>
+    <!-- Web3.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.8.1/web3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #1a237e;
+            margin-bottom: 10px;
+        }
+
+        .wallet-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .status-text {
+            color: #666;
+        }
+
+        .address {
+            font-family: monospace;
+            color: #1a237e;
+        }
+
+        .connect-btn, .send-btn {
+            background: #1a237e;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s ease;
+        }
+
+        .connect-btn:hover, .send-btn:hover {
+            background: #0d147b;
+        }
+
+        .connect-btn:disabled, .send-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            color: #1a237e;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #1a237e;
+        }
+
+        .transaction-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            display: none;
+        }
+
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .loading {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1>Token Transfer</h1>
+                <p>Connect your wallet and send tokens securely</p>
+            </div>
+
+            <div class="wallet-status">
+                <div class="status-text">
+                    Wallet Status: <span id="connectionStatus">Not Connected</span>
+                </div>
+                <button id="connectBtn" class="connect-btn">Connect Wallet</button>
+            </div>
+
+            <div style="text-align: center;">
+                <button id="sendBtn" class="send-btn" disabled>Send Tokens</button>
+            </div>
+
+            <div id="transactionStatus" class="transaction-status"></div>
+        </div>
+    </div>
+
+    <!-- Transfer Modal -->
+    <div class="modal" id="transferModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <div class="modal-header">
+                <h3 class="modal-title">Send Tokens</h3>
+            </div>
+            <div class="modal-body">
+                <form id="transferForm">
+                    <div class="form-group">
+                        <label for="receiverAddress">Receiver Address</label>
+                        <input type="text" id="receiverAddress" placeholder="Enter receiver's wallet address" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Amount</label>
+                        <input type="number" id="amount" placeholder="Enter amount to send" step="0.000001" required>
+                    </div>
+                    <button type="submit" class="send-btn">Confirm Transfer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Web3 initialization
+        let web3;
+        let userAccount;
+        const tokenContractABI = [
+            // Add your token contract ABI here
+            {
+                "constant": false,
+                "inputs": [
+                    {
+                        "name": "_to",
+                        "type": "address"
+                    },
+                    {
+                        "name": "_value",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "transfer",
+                "outputs": [
+                    {
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
+        const tokenContractAddress = "YOUR_TOKEN_CONTRACT_ADDRESS"; // Replace with your token contract address
+
+        // DOM Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const transferModal = document.getElementById('transferModal');
+        const transferForm = document.getElementById('transferForm');
+        const transactionStatus = document.getElementById('transactionStatus');
+
+        // Check if MetaMask is installed
+        async function checkMetaMaskInstalled() {
+            if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
+                return true;
+            }
+            alert('Please install MetaMask to use this feature!');
+            return false;
+        }
+
+        // Connect to MetaMask
+        async function connectWallet() {
+            if (await checkMetaMaskInstalled()) {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    userAccount = accounts[0];
+                    connectionStatus.textContent = `Connected: ${userAccount.substring(0, 6)}...${userAccount.substring(38)}`;
+                    connectBtn.textContent = 'Connected';
+                    connectBtn.disabled = true;
+                    sendBtn.disabled = false;
+
+                    // Listen for account changes
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                } catch (error) {
+                    console.error(error);
+                    showTransactionStatus('Error connecting wallet', 'error');
+                }
+            }
+        }
+
+        // Handle account changes
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                // MetaMask is locked or user has no accounts
+                resetConnection();
+            } else if (accounts[0] !== userAccount) {
+                userAccount = accounts[0];
+                connectionStatus.textContent = `Connected: ${userAccount.substring(0, 6)}...${userAccount.substring(38)}`;
+            }
+        }
+
+        // Reset connection
+        function resetConnection() {
+            userAccount = null;
+            connectionStatus.textContent = 'Not Connected';
+            connectBtn.textContent = 'Connect Wallet';
+            connectBtn.disabled = false;
+            sendBtn.disabled = true;
+        }
+
+        // Show/hide modal
+        function openModal() {
+            transferModal.classList.add('active');
+        }
+
+        function closeModal() {
+            transferModal.classList.remove('active');
+            transferForm.reset();
+        }
+
+        // Show transaction status
+        function showTransactionStatus(message, type) {
+            transactionStatus.textContent = message;
+            transactionStatus.className = `transaction-status ${type}`;
+            transactionStatus.style.display = 'block';
+            setTimeout(() => {
+                transactionStatus.style.display = 'none';
+            }, 5000);
+        }
+
+        // Handle token transfer
+        async function transferTokens(receiverAddress, amount) {
+            try {
+                const tokenContract = new web3.eth.Contract(tokenContractABI, tokenContractAddress);
+                const amountInWei = web3.utils.toWei(amount.toString(), 'ether');
+
+                showTransactionStatus('Processing transaction...', 'loading');
+
+                const transaction = await tokenContract.methods.transfer(receiverAddress, amountInWei)
+                    .send({ from: userAccount });
+
+                showTransactionStatus('Transaction successful!', 'success');
+                closeModal();
+
+                return transaction;
+            } catch (error) {
+                console.error(error);
+                showTransactionStatus('Transaction failed. Please try again.', 'error');
+                throw error;
+            }
+        }
+
+        // Event Listeners
+        connectBtn.addEventListener('click', connectWallet);
+        sendBtn.addEventListener('click', openModal);
+
+        transferForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const receiverAddress = document.getElementById('receiverAddress').value;
+            const amount = document.getElementById('amount').value;
+
+            try {
+                await transferTokens(receiverAddress, amount);
+            } catch (error) {
+                console.error('Transfer failed:', error);
+            }
+        });
+
+        // Close modal if clicking outside
+        window.onclick = function(event) {
+            if (event.target === transferModal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>

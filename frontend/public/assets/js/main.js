@@ -106,13 +106,6 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>
         <button class="btn btn-confirm-nft-transfer" data-userid="${profile._id}">Confirm NFT Transfer</button>
       </div>
-      <div class="token-transfer-form" style="display: none;">
-        <div class="input-group">
-          <label for="tokenAmount-${profile._id}">Amount (ETH):</label>
-          <input type="text" id="tokenAmount-${profile._id}" placeholder="0.1">
-        </div>
-        <button class="btn btn-confirm-token-transfer" data-userid="${profile._id}">Confirm Token Transfer</button>
-      </div>
       <div class="status" id="status-${profile._id}" style="display: none;"></div>
     `;
 
@@ -121,8 +114,7 @@ document.addEventListener("DOMContentLoaded", function() {
     card.querySelector('.btn-send-nft-phosphor').addEventListener('click', () => handleSendNFTViaPhosphor(profile));
     card.querySelector('.btn-send-nft-metamask').addEventListener('click', () => handleSendNFTViaMetaMask(profile));
     card.querySelector('.btn-confirm-nft-transfer').addEventListener('click', () => sendNFT(profile));
-    card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
-    card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
+    card.querySelector('.btn-send-tokens').addEventListener('click', () => openSendTokenPage(profile._id));
 
     // Initialize NFT count
     initializeNFTCount(profile._id);
@@ -169,10 +161,8 @@ document.addEventListener("DOMContentLoaded", function() {
     nftTransferForm.style.display = nftTransferForm.style.display === 'none' ? 'block' : 'none';
   }
 
-  function toggleTokenTransferForm(profileId) {
-    const card = document.querySelector(`.profile-card[data-userid="${profileId}"]`);
-    const tokenTransferForm = card.querySelector('.token-transfer-form');
-    tokenTransferForm.style.display = tokenTransferForm.style.display === 'none' ? 'block' : 'none';
+  function openSendTokenPage(profileId) {
+    window.open('SENDTOKENS.html', '_blank');
   }
 
   async function connectWallet() {
@@ -246,51 +236,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
     } catch (error) {
       showStatus('Error sending NFT: ' + error.message, false, profile._id);
-    }
-  }
-
-  async function sendTokens(profile) {
-    if (!connectedAccount) {
-      await connectWallet();
-      if (!connectedAccount) {
-        showStatus('Please connect your wallet first!', false, profile._id);
-        return;
-      }
-    }
-
-    const amount = document.getElementById(`tokenAmount-${profile._id}`).value;
-    const recipientAddress = profile._id; // Assuming profile._id is the recipient's address
-
-    if (!amount) {
-      showStatus('Please enter an amount!', false, profile._id);
-      return;
-    }
-
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-
-      // Send transaction
-      const transaction = await signer.sendTransaction({
-        to: recipientAddress,
-        value: ethers.utils.parseEther(amount)
-      });
-
-      showStatus('Transaction sent! Waiting for confirmation...', true, profile._id);
-
-      // Wait for transaction confirmation
-      const receipt = await transaction.wait();
-      showStatus(`Tokens sent successfully! Transaction hash: ${receipt.transactionHash}`, true, profile._id);
-
-      // Increase the NFT count (assuming token transfer also increases NFT count)
-      let currentCount = parseInt(localStorage.getItem(`nftCount-${profile._id}`), 10) || 0;
-      localStorage.setItem(`nftCount-${profile._id}`, currentCount + 1);
-      
-      // Update the displayed count
-      updateNFTCountDisplay(profile._id);
-
-    } catch (error) {
-      showStatus('Error sending tokens: ' + error.message, false, profile._id);
     }
   }
 
