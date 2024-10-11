@@ -59,43 +59,6 @@ const isAuthenticated = (req, res, next) => {
     }
 };
 
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('New user connected');
-
-  socket.on('joinRoom', (roomId) => {
-    socket.join(roomId);
-    console.log(`User joined room: ${roomId}`);
-  });
-
-  socket.on('sendMessage', async (data) => {
-    const { senderId, receiverId, message } = data;
-    const roomId = [senderId, receiverId].sort().join('-');
-
-    // Save the message to the database
-    try {
-      const newMessage = new Message({
-        sender: senderId,
-        receiver: receiverId,
-        content: message,
-      });
-      await newMessage.save();
-
-      // Emit the message to the room
-      io.to(roomId).emit('newMessage', {
-        sender: senderId,
-        content: message,
-        timestamp: new Date(),
-      });
-    } catch (error) {
-      console.error('Error saving message:', error);
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected');
-  });
-});
 
 // API routes
 
@@ -256,58 +219,6 @@ app.put("/api/user/update", isAuthenticated, async (req, res) => {
     }
 });
 
-// New route to serve the chat window
-app.get('/chat', (req, res, next) => {
-  console.log('Session:', req.session);
-  console.log('User ID:', req.session.userId);
-  
-  if (req.session && req.session.userId) {
-    res.sendFile(path.join(__dirname, '../frontend/public', 'chat.html'));
-  } else {
-    res.status(401).json({ message: "Unauthorized" });
-  }
-});
-
-// New route to get chat history
-app.get('/api/chat-history', isAuthenticated, async (req, res) => {
-  const { userId, otherUserId } = req.query;
-  const roomId = [userId, otherUserId].sort().join('-');
-
-  try {
-    const messages = await Message.find({
-      $or: [
-        { sender: userId, receiver: otherUserId },
-        { sender: otherUserId, receiver: userId }
-      ]
-    }).sort('timestamp');
-
-    res.json(messages);
-  } catch (error) {
-    console.error('Error fetching chat history:', error);
-    res.status(500).json({ message: "Error fetching chat history" });
-  }
-});
-
-// New route to update wallet balance
-app.post('/api/update-wallet', isAuthenticated, async (req, res) => {
-    const { userId, amount } = req.body;
-
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        // Convert amount to a number and add it to the current wallet balance
-        user.wallet += parseFloat(amount);
-        await user.save();
-
-        res.json({ message: "Wallet balance updated successfully", newBalance: user.wallet });
-    } catch (error) {
-        console.error('Error updating wallet balance:', error);
-        res.status(500).json({ message: "Error updating wallet balance", error: error.message });
-    }
-});
 
 // Catch-all route to serve the frontend for any other requests
 app.get('*', (req, res) => {

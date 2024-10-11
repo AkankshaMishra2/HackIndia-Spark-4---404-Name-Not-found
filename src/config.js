@@ -1,7 +1,9 @@
+require('dotenv').config();
+
 const mongoose = require('mongoose');
 
 // Use environment variable for MongoDB URI
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/admin";
+const MONGODB_URI = process.env.MONGODB_URI ||"mongodb+srv://Akanksha_2004:Akanksha_2004@user.y470l.mongodb.net/guidex";
 
 // Improved connection function
 const connectDB = async () => {
@@ -45,34 +47,14 @@ const userSchema = new mongoose.Schema({
   timestamps: true // Adds createdAt and updatedAt timestamps
 });
 
-// Message schema
-const messageSchema = new mongoose.Schema({
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  receiver: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  content: {
-    type: String,
-    required: true
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  }
-});
+
 
 // Create and export the models
 const User = mongoose.model('User', userSchema);
-const Message = mongoose.model('Message', messageSchema);
+
 
 module.exports = {
   connectDB,
-  User,
-  Message
+  User
+ 
 };
