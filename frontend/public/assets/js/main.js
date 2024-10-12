@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   let profiles = [];
   let solanaConnection;
-  let solanaPublicKey;
+  let walletPublicKey;
 
   async function fetchProfiles() {
     try {
@@ -55,14 +55,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
- 
-
-  /*******************************************Create a profile card element for the given profile.********************************************************/
-
-  
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';
+    card.dataset.userid = profile._id;  // Add this line
     card.innerHTML = `
       <img src="${profile.image || '/placeholder.svg?height=100&width=100'}" alt="${profile.name}" class="profile-image">
       <h3>${profile.name}</h3>
@@ -84,6 +80,7 @@ document.addEventListener("DOMContentLoaded", function() {
           <input type="number" id="tokenAmount-${profile._id}" placeholder="Enter amount to send">
         </div>
         <button class="btn btn-confirm-token-transfer" data-userid="${profile._id}">Confirm Token Transfer</button>
+        <button class="btn btn-request-airdrop" data-userid="${profile._id}" style="display: none;">Request Airdrop</button>
       </div>
       <div class="status" id="status-${profile._id}" style="display: none;"></div>
     `;
@@ -92,6 +89,7 @@ document.addEventListener("DOMContentLoaded", function() {
     card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
     card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
     card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
+    card.querySelector('.btn-request-airdrop').addEventListener('click', () => requestAirdrop(profile._id));
 
     return card;
   }
@@ -105,8 +103,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function toggleTokenTransferForm(profileId) {
     const card = document.querySelector(`.profile-card[data-userid="${profileId}"]`);
-    const tokenTransferForm = card.querySelector('.token-transfer-form');
-    tokenTransferForm.style.display = tokenTransferForm.style.display === 'none' ? 'block' : 'none';
+    if (card) {
+      const tokenTransferForm = card.querySelector('.token-transfer-form');
+      const airdropButton = card.querySelector('.btn-request-airdrop');
+      
+      if (tokenTransferForm && airdropButton) {
+        if (tokenTransferForm.style.display === 'none') {
+          tokenTransferForm.style.display = 'block';
+          airdropButton.style.display = 'block';
+        } else {
+          tokenTransferForm.style.display = 'none';
+          airdropButton.style.display = 'none';
+        }
+      }
+    }
   }
 
   function openChatWindow(profileId) {
@@ -115,15 +125,18 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   async function connectWallet() {
-    if (window.solana && window.solana.isPhantom) {
+    if ('solana' in window) {
       try {
         const resp = await window.solana.connect();
-        solanaPublicKey = resp.publicKey;
-        solanaConnection = new solanaWeb3.Connection("https://api.devnet.solana.com");
-        showStatus(`Solana wallet connected: ${solanaPublicKey.toString().substring(0,6)}...${solanaPublicKey.toString().substring(38)}`, true, 'global');
+        walletPublicKey = resp.publicKey;
+        solanaConnection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+        showStatus(`Solana wallet connected: ${walletPublicKey.toString().substring(0,6)}...${walletPublicKey.toString().substring(38)}`, true, 'global');
         
         // Save wallet address to user profile
-        await saveWalletAddress(solanaPublicKey.toString());
+        await saveWalletAddress(walletPublicKey.toString());
+
+        // Update UI to show connected state
+        updateWalletUI();
       } catch (error) {
         showStatus('Error connecting Solana wallet: ' + error.message, false, 'global');
       }
@@ -155,7 +168,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   async function sendTokens(profile) {
-    if (!solanaPublicKey) {
+    if (!walletPublicKey) {
       showStatus('Please connect your Solana wallet first!', false, profile._id);
       return;
     }
@@ -171,7 +184,7 @@ document.addEventListener("DOMContentLoaded", function() {
     try {
       const transaction = new solanaWeb3.Transaction().add(
         solanaWeb3.SystemProgram.transfer({
-          fromPubkey: solanaPublicKey,
+          fromPubkey: walletPublicKey,
           toPubkey: new solanaWeb3.PublicKey(recipientAddress),
           lamports: amount * solanaWeb3.LAMPORTS_PER_SOL,
         })
@@ -179,7 +192,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
       const { blockhash } = await solanaConnection.getRecentBlockhash();
       transaction.recentBlockhash = blockhash;
-      transaction.feePayer = solanaPublicKey;
+      transaction.feePayer = walletPublicKey;
 
       const signed = await window.solana.signTransaction(transaction);
       const signature = await solanaConnection.sendRawTransaction(signed.serialize());
@@ -251,30 +264,33 @@ document.addEventListener("DOMContentLoaded", function() {
     return globalStatus;
   }
 
-  async function requestAirdrop() {
-    if (!solanaPublicKey) {
-      showStatus('Please connect your Solana wallet first!', false, 'global');
+  async function requestAirdrop(profileId) {
+    if (!walletPublicKey) {
+      showStatus('Please connect your Solana wallet first!', false, profileId);
       return;
     }
 
     try {
-      const response = await fetch('/api/airdrop', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount: 1 }), // Request 1 SOL
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to request airdrop');
-      }
-
-      const data = await response.json();
-      showStatus(`Airdrop successful! New balance: ${data.newBalance} SOL`, true, 'global');
+      const signature = await solanaConnection.requestAirdrop(walletPublicKey, solanaWeb3.LAMPORTS_PER_SOL);
+      await solanaConnection.confirmTransaction(signature);
+      showStatus('Airdrop of 1 SOL successful!', true, profileId);
+      
+      // Update user's token count in the database
+      await updateTokenCount(profileId, 1);
     } catch (error) {
-      showStatus('Error requesting airdrop: ' + error.message, false, 'global');
+      showStatus('Error requesting airdrop: ' + error.message, false, profileId);
+    }
+  }
+
+  function updateWalletUI() {
+    const connectButton = document.getElementById('connectWallet');
+    
+    if (walletPublicKey) {
+      connectButton.textContent = `Connected: ${walletPublicKey.toString().substring(0,6)}...${walletPublicKey.toString().substring(38)}`;
+      connectButton.disabled = true;
+    } else {
+      connectButton.textContent = 'Connect Wallet';
+      connectButton.disabled = false;
     }
   }
 
@@ -298,12 +314,6 @@ document.addEventListener("DOMContentLoaded", function() {
     connectWalletButton.addEventListener('click', connectWallet);
   }
 
-  // Airdrop button
-  const airdropButton = document.getElementById('requestAirdrop');
-  if (airdropButton) {
-    airdropButton.addEventListener('click', requestAirdrop);
-  }
-
   function filterProfiles() {
     const searchTerm = profileSearch.value.toLowerCase();
     const activeCategory = document.querySelector('.category-btn.active').dataset.category;
@@ -316,5 +326,10 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     renderProfiles(filteredProfiles);
+  }
+
+  // Check if wallet is already connected
+  if (window.solana && window.solana.isConnected) {
+    connectWallet();
   }
 });

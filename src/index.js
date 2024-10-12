@@ -10,6 +10,7 @@ const session = require('express-session');
 const { connectDB, User, Message } = require('./config');
 const http = require('http');
 const socketIO = require('socket.io');
+const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 
 // Create Express app
 const app = express();
@@ -58,7 +59,10 @@ const isAuthenticated = (req, res, next) => {
         res.status(401).json({ message: "Unauthorized" });
     }
 };
-
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
 
 // API routes
 
@@ -85,6 +89,7 @@ app.post("/api/signup", async (req, res) => {
             status,
             college,
             tier: 'copper', // Set default tier to copper
+            tokenCount: 0, // Initialize token count
         });
 
         await newUser.save();
@@ -163,8 +168,9 @@ app.get("/api/user/profile", isAuthenticated, async (req, res) => {
                 bio: user.bio,
                 status: user.status,
                 college: user.college,
-                tier: user.tier || 'copper',
-                wallet: user.wallet
+                tier: user.tier,
+                walletAddress: user.walletAddress,
+                tokenCount: user.tokenCount
             }
         });
     } catch (error) {
@@ -176,7 +182,7 @@ app.get("/api/user/profile", isAuthenticated, async (req, res) => {
 // Get all profiles
 app.get("/api/profiles", async (req, res) => {
     try {
-        const profiles = await User.find({}, 'name email skills experience bio status college tier');
+        const profiles = await User.find({}, 'name email skills experience bio status college tier tokenCount');
         res.json(profiles);
     } catch (error) {
         console.error('Error fetching profiles:', error);
@@ -210,7 +216,8 @@ app.put("/api/user/update", isAuthenticated, async (req, res) => {
                 status: user.status,
                 college: user.college,
                 tier: user.tier,
-                wallet: user.wallet
+                walletAddress: user.walletAddress,
+                tokenCount: user.tokenCount
             }
         });
     } catch (error) {
@@ -219,6 +226,123 @@ app.put("/api/user/update", isAuthenticated, async (req, res) => {
     }
 });
 
+// Update user's wallet address
+app.post("/api/user/update-wallet", isAuthenticated, async (req, res) => {
+    console.log("Received request to update wallet address");
+    const { walletAddress } = req.body;
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            req.session.userId,
+            { walletAddress },
+            { new: true, runValidators: true }
+        );
+
+        if (!user) {
+            console.log("User not found for wallet update");
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        console.log(`Wallet address updated for user: ${user._id}`);
+        res.json({
+            message: "Wallet address updated successfully",
+            user: {
+                name: user.name,
+                email: user.email,
+                walletAddress: user.walletAddress
+            }
+        });
+    } catch (error) {
+        console.error('Error updating wallet address:', error);
+        res.status(500).json({ message: "Error updating wallet address", error: error.message });
+    }
+});
+
+// Update user's token count
+app.post("/api/user/update-tokens", isAuthenticated, async (req, res) => {
+    const { profileId, amount } = req.body;
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            profileId,
+            { $inc: { tokenCount: amount } },
+            { new: true, runValidators: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if the user's tier needs to be updated
+        const newTier = calculateTier(user.tokenCount);
+        if (newTier !== user.tier) {
+            user.tier = newTier;
+            await user.save();
+        }
+
+        res.json({
+            message: "Token count updated successfully",
+            user: {
+                name: user.name,
+                email: user.email,
+                tokenCount: user.tokenCount,
+                tier: user.tier
+            }
+        });
+    } catch (error) {
+        console.error('Error updating token count:', error);
+        res.status(500).json({ message: "Error updating token count", error: error.message });
+    }
+});
+
+function calculateTier(tokenCount) {
+    if (tokenCount >= 1000) return 'legendary';
+    if (tokenCount >= 500) return 'titanium';
+    if (tokenCount >= 250) return 'platinum';
+    if (tokenCount >= 100) return 'gold';
+    if (tokenCount >= 50) return 'silver';
+    if (tokenCount >= 25) return 'bronze';
+    return 'copper';
+}
+
+// Airdrop tokens to a user (for testing purposes)
+app.post("/api/airdrop", isAuthenticated, async (req, res) => {
+    const { amount } = req.body;
+
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user || !user.walletAddress) {
+            return res.status(400).json({ message: "User not found or wallet not connected" });
+        }
+
+        const connection = new Connection("https://api.devnet.solana.com");
+        const publicKey = new PublicKey(user.walletAddress);
+
+        const signature = await connection.requestAirdrop(publicKey, amount * LAMPORTS_PER_SOL);
+        await connection.confirmTransaction(signature);
+
+        // Update user's token count in the database
+        user.tokenCount += parseFloat(amount);
+        await user.save();
+
+        // Check if the user's tier needs to be updated
+        const newTier = calculateTier(user.tokenCount);
+        if (newTier !== user.tier) {
+            user.tier = newTier;
+            await user.save();
+        }
+
+        res.json({
+            message: "Airdrop successful",
+            signature,
+            newBalance: user.tokenCount,
+            newTier: user.tier
+        });
+    } catch (error) {
+        console.error('Airdrop error:', error);
+        res.status(500).json({ message: "Error during airdrop", error: error.message });
+    }
+});
 
 // Catch-all route to serve the frontend for any other requests
 app.get('*', (req, res) => {
@@ -233,15 +357,12 @@ app.use((err, req, res, next) => {
     res.status(500).send('Something broke!');
 });
 
+
+app.use((err, req, res, next) => {
+    console.error(`${new Date().toISOString()} - Error:`, err);
+    res.status(500).send('Something broke!');
+});
 // Start the server
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-
-
-
-
-
-
-// Anushi's work - web3-----------------------------------------
-
