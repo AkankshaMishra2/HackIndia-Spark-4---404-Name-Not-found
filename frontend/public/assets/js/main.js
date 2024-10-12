@@ -1,3 +1,4 @@
+
 document.addEventListener("DOMContentLoaded", function() {
   // Add the ethers.js script
   const ethersScript = document.createElement('script');
