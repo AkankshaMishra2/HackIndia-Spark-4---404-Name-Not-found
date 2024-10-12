@@ -127,10 +127,10 @@ document.addEventListener("DOMContentLoaded", function() {
     tokenTransferForm.style.display = tokenTransferForm.style.display === 'none' ? 'block' : 'none';
   }
 
-  function openChatWindow(profileId) {
-    // Implement chat window opening logic
-    console.log(`Opening chat window for profile: ${profileId}`);
-  }
+  // function openChatWindow(profileId) {
+  //   // Implement chat window opening logic
+  //   console.log(`Opening chat window for profile: ${profileId}`);
+  // }
 
   async function connectWallet() {
     if (window.solana && window.solana.isPhantom) {
