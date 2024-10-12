@@ -10,7 +10,7 @@ const session = require('express-session');
 const { connectDB, User, Message } = require('./config');
 const http = require('http');
 const socketIO = require('socket.io');
-const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const { Connection, PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } = require('@solana/web3.js');
 
 // Create Express app
 const app = express();
@@ -59,10 +59,6 @@ const isAuthenticated = (req, res, next) => {
         res.status(401).json({ message: "Unauthorized" });
     }
 };
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-});
 
 // API routes
 
@@ -88,8 +84,8 @@ app.post("/api/signup", async (req, res) => {
             bio,
             status,
             college,
-            tier: 'copper', // Set default tier to copper
-            tokenCount: 0, // Initialize token count
+            tier: 'copper',
+            tokenCount: 0,
         });
 
         await newUser.save();
@@ -226,35 +222,27 @@ app.put("/api/user/update", isAuthenticated, async (req, res) => {
     }
 });
 
-// Update user's wallet address
-app.post("/api/user/update-wallet", isAuthenticated, async (req, res) => {
-    console.log("Received request to update wallet address");
-    const { walletAddress } = req.body;
+// Check login status
+app.get("/api/user/check-login", (req, res) => {
+    if (req.session && req.session.userId) {
+        res.json({ isLoggedIn: true });
+    } else {
+        res.json({ isLoggedIn: false });
+    }
+});
 
+// Update user's wallet address
+app.post('/api/user/update-wallet', isAuthenticated, async (req, res) => {
+    const { walletAddress } = req.body;
     try {
         const user = await User.findByIdAndUpdate(
             req.session.userId,
             { walletAddress },
-            { new: true, runValidators: true }
+            { new: true }
         );
-
-        if (!user) {
-            console.log("User not found for wallet update");
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        console.log(`Wallet address updated for user: ${user._id}`);
-        res.json({
-            message: "Wallet address updated successfully",
-            user: {
-                name: user.name,
-                email: user.email,
-                walletAddress: user.walletAddress
-            }
-        });
+        res.json({ message: 'Wallet address updated successfully', user });
     } catch (error) {
-        console.error('Error updating wallet address:', error);
-        res.status(500).json({ message: "Error updating wallet address", error: error.message });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -273,7 +261,6 @@ app.post("/api/user/update-tokens", isAuthenticated, async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Check if the user's tier needs to be updated
         const newTier = calculateTier(user.tokenCount);
         if (newTier !== user.tier) {
             user.tier = newTier;
@@ -305,7 +292,7 @@ function calculateTier(tokenCount) {
     return 'copper';
 }
 
-// Airdrop tokens to a user (for testing purposes)
+// Airdrop tokens to a user
 app.post("/api/airdrop", isAuthenticated, async (req, res) => {
     const { amount } = req.body;
 
@@ -321,11 +308,9 @@ app.post("/api/airdrop", isAuthenticated, async (req, res) => {
         const signature = await connection.requestAirdrop(publicKey, amount * LAMPORTS_PER_SOL);
         await connection.confirmTransaction(signature);
 
-        // Update user's token count in the database
         user.tokenCount += parseFloat(amount);
         await user.save();
 
-        // Check if the user's tier needs to be updated
         const newTier = calculateTier(user.tokenCount);
         if (newTier !== user.tier) {
             user.tier = newTier;
@@ -344,24 +329,68 @@ app.post("/api/airdrop", isAuthenticated, async (req, res) => {
     }
 });
 
-// Catch-all route to serve the frontend for any other requests
+// Send tokens
+app.post("/api/send-tokens", isAuthenticated, async (req, res) => {
+    const { amount, recipientAddress } = req.body;
+
+    try {
+        const sender = await User.findById(req.session.userId);
+        if (!sender || !sender.walletAddress) {
+            return res.status(400).json({ message: "Sender not found or wallet not connected" });
+        }
+
+        const connection = new Connection("https://api.devnet.solana.com");
+        const senderPublicKey = new PublicKey(sender.walletAddress);
+        const recipientPublicKey = new PublicKey(recipientAddress);
+
+        const transaction = new Transaction().add(
+            SystemProgram.transfer({
+                fromPubkey: senderPublicKey,
+                toPubkey: recipientPublicKey,
+                lamports: amount * LAMPORTS_PER_SOL
+            })
+        );
+
+        // Get the latest blockhash
+        const { blockhash } = await connection.getRecentBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = senderPublicKey;
+
+        // Sign the transaction (this should be done client-side in a real application)
+        // For demonstration purposes, we're using a dummy private key here
+        // In a real application, the user would sign this with their wallet
+        const dummyPrivateKey = "dummy_private_key";
+        const signedTransaction = await Transaction.sign([dummyPrivateKey], transaction);
+
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        await connection.confirmTransaction(signature);
+
+        // Update sender's token count
+        sender.tokenCount -= parseFloat(amount);
+        await sender.save();
+
+        res.json({
+            message: "Tokens sent successfully",
+            signature,
+            newBalance: sender.tokenCount
+        });
+    } catch (error) {
+        console.error('Error sending tokens:', error);
+        res.status(500).json({ message: "Error sending tokens", error: error.message });
+    }
+});
+
+// Catch-all route to serve the frontend
 app.get('*', (req, res) => {
-    const indexPath = path.join(__dirname, '../frontend/public', 'index.html');
-    console.log('Serving index.html from:', indexPath);
-    res.sendFile(indexPath);
+    res.sendFile(path.join(__dirname, '../frontend/public', 'index.html'));
 });
 
-// Error handling middleware (should be at the bottom)
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
-});
-
-
+// Error handling middleware
 app.use((err, req, res, next) => {
     console.error(`${new Date().toISOString()} - Error:`, err);
     res.status(500).send('Something broke!');
 });
+
 // Start the server
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
