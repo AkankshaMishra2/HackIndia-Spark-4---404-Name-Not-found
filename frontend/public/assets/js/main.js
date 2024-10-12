@@ -55,6 +55,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
+ 
+
+  /*******************************************Create a profile card element for the given profile.********************************************************/
+
+  
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';
