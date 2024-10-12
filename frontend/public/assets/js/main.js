@@ -60,30 +60,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
-<<<<<<< HEAD
-  // earlier at this place the code of the function createProfileCard was written, but i have moved it to the below so that I can work easily - Anushi
-   function openChatWindow(userId) {
 
-     // Open a new window to the realtime chat server, passing the userId as a query parameter
-     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
-    
-     if (chatWindow) {
-         chatWindow.focus();
-     } else {
-         alert('Please allow popups for this website to use the chat feature.');
-     }
-}
 
 
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------
-=======
- 
-
-  /*******************************************Create a profile card element for the given profile.********************************************************/
-
-  
->>>>>>> e80572bd79f7d7ab8ec1e0844c61d07358172f3e
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';
@@ -126,6 +107,21 @@ document.addEventListener("DOMContentLoaded", function() {
 
     return card;
   }
+
+
+  /******************************************************* Chat App Code - Anushi ********************************************************/
+  function openChatWindow(userId) {
+     // Open a new window to the realtime chat server, passing the userId as a query parameter
+     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
+    
+     if (chatWindow) {
+         chatWindow.focus();
+     } else {
+         alert('Please allow popups for this website to use the chat feature.');
+     }
+}
+
+
 
   /******************************************************* Render the given profiles in the profiles container.********************************************************/
   
