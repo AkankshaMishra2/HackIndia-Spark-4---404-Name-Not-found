@@ -1,9 +1,8 @@
-
 document.addEventListener("DOMContentLoaded", function() {
-  // Add the ethers.js script
-  const ethersScript = document.createElement('script');
-  ethersScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js';
-  document.head.appendChild(ethersScript);
+  // Add the Solana Web3.js script
+  const solanaScript = document.createElement('script');
+  solanaScript.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
+  document.head.appendChild(solanaScript);
 
   // Navigation menu toggle
   const navMenu = document.getElementById("nav-menu");
@@ -34,12 +33,8 @@ document.addEventListener("DOMContentLoaded", function() {
   const categoryButtons = document.querySelectorAll('.category-btn');
 
   let profiles = [];
-  let connectedAccount = null;
-
-
-
-  /*************************************** Fetch profiles from the server and render them.************************************/
-
+  let solanaConnection;
+  let solanaPublicKey;
 
   async function fetchProfiles() {
     try {
@@ -60,11 +55,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
+ 
 
+  /*******************************************Create a profile card element for the given profile.********************************************************/
 
-
-
-//----------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';
@@ -74,36 +69,29 @@ document.addEventListener("DOMContentLoaded", function() {
       <p>${profile.skills.join(', ')}</p>
       <p>${profile.college || 'Not specified'}</p>
       <span class="tier ${profile.tier.toLowerCase()}">${profile.tier}</span>
-      <p class="nft-count">NFT Count: <span id="nftCount-${profile._id}">0</span></p>
+      <p class="token-count">Token Count: <span id="tokenCount-${profile._id}">${profile.tokenCount || 0}</span></p>
       <div class="profile-actions">
         <button class="btn btn-message" data-userid="${profile._id}">Message</button>
-        <button class="btn btn-send-nft-phosphor" data-userid="${profile._id}">Send NFT via PHOSPHOR</button>
-        <button class="btn btn-send-nft-metamask" data-userid="${profile._id}">Send NFT via MetaMask</button>
         <button class="btn btn-send-tokens" data-userid="${profile._id}">Send Tokens</button>
       </div>
-      <div class="nft-transfer-form" style="display: none;">
+      <div class="token-transfer-form" style="display: none;">
         <div class="input-group">
-          <label for="contractAddress-${profile._id}">NFT Contract Address:</label>
-          <input type="text" id="contractAddress-${profile._id}" placeholder="0x...">
+          <label for="recipientAddress-${profile._id}">Recipient Address:</label>
+          <input type="text" id="recipientAddress-${profile._id}" placeholder="Enter recipient address">
         </div>
         <div class="input-group">
-          <label for="tokenId-${profile._id}">Token ID:</label>
-          <input type="text" id="tokenId-${profile._id}" placeholder="Enter token ID">
+          <label for="tokenAmount-${profile._id}">Amount (SOL):</label>
+          <input type="number" id="tokenAmount-${profile._id}" placeholder="Enter amount to send">
         </div>
-        <button class="btn btn-confirm-nft-transfer" data-userid="${profile._id}">Confirm NFT Transfer</button>
+        <button class="btn btn-confirm-token-transfer" data-userid="${profile._id}">Confirm Token Transfer</button>
       </div>
       <div class="status" id="status-${profile._id}" style="display: none;"></div>
     `;
 
     // Add event listeners to the buttons
     card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
-    card.querySelector('.btn-send-nft-phosphor').addEventListener('click', () => handleSendNFTViaPhosphor(profile));
-    card.querySelector('.btn-send-nft-metamask').addEventListener('click', () => handleSendNFTViaMetaMask(profile));
-    card.querySelector('.btn-confirm-nft-transfer').addEventListener('click', () => sendNFT(profile));
-    card.querySelector('.btn-send-tokens').addEventListener('click', () => openSendTokenPage(profile._id));
-
-    // Initialize NFT count
-    initializeNFTCount(profile._id);
+    card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
+    card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
 
     return card;
   }
@@ -133,122 +121,126 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  
-  /*************************************************Handle sending NFT via Phospher**********************************************************************/
-  
-  function handleSendNFTViaPhosphor(profile) {
-    // Increase the NFT count
-    let currentCount = parseInt(localStorage.getItem(`nftCount-${profile._id}`), 10) || 0;
-    localStorage.setItem(`nftCount-${profile._id}`, currentCount + 1);
-    
-    // Update the displayed count
-    updateNFTCountDisplay(profile._id);
-
-    // Open the Phosphor website
-    window.open('https://phosphor.xyz/', '_blank');
+  function toggleTokenTransferForm(profileId) {
+    const card = document.querySelector(`.profile-card[data-userid="${profileId}"]`);
+    const tokenTransferForm = card.querySelector('.token-transfer-form');
+    tokenTransferForm.style.display = tokenTransferForm.style.display === 'none' ? 'block' : 'none';
   }
 
-  /************************************************Handle sending NFT via MetaMask.**************************************************************/
-  
-  function handleSendNFTViaMetaMask(profile) {
-    const card = document.querySelector(`.profile-card[data-userid="${profile._id}"]`);
-    const nftTransferForm = card.querySelector('.nft-transfer-form');
-    nftTransferForm.style.display = nftTransferForm.style.display === 'none' ? 'block' : 'none';
+  function openChatWindow(profileId) {
+    // Implement chat window opening logic
+    console.log(`Opening chat window for profile: ${profileId}`);
   }
-
-  /********************************************************** Open the send token page.******************************************************************/
-  
-  function openSendTokenPage(profileId) {
-    window.open('SENDTOKENS.html', '_blank');
-  }
-
-  /********************************************************************* Connect the user's wallet using MetaMask.*************************************/
-
 
   async function connectWallet() {
-    if (typeof window.ethereum !== 'undefined') {
+    if (window.solana && window.solana.isPhantom) {
       try {
-        const accounts = await window.ethereum.request({ 
-          method: 'eth_requestAccounts' 
-        });
-        connectedAccount = accounts[0];
-        showStatus(`Connected: ${connectedAccount.substring(0,6)}...${connectedAccount.substring(38)}`, true, 'global');
+        const resp = await window.solana.connect();
+        solanaPublicKey = resp.publicKey;
+        solanaConnection = new solanaWeb3.Connection("https://api.devnet.solana.com");
+        showStatus(`Solana wallet connected: ${solanaPublicKey.toString().substring(0,6)}...${solanaPublicKey.toString().substring(38)}`, true, 'global');
         
-        // Listen for account changes
-        window.ethereum.on('accountsChanged', function (accounts) {
-          connectedAccount = accounts[0];
-          showStatus(`Connected: ${connectedAccount.substring(0,6)}...${connectedAccount.substring(38)}`, true, 'global');
-        });
-
+        // Save wallet address to user profile
+        await saveWalletAddress(solanaPublicKey.toString());
       } catch (error) {
-        showStatus('Error connecting wallet: ' + error.message, false, 'global');
+        showStatus('Error connecting Solana wallet: ' + error.message, false, 'global');
       }
     } else {
-      showStatus('Please install MetaMask!', false, 'global');
+      showStatus('Please install Phantom wallet!', false, 'global');
     }
   }
 
-  /**
-   * Send an NFT to the specified profile.
-   * @param {Object} profile - The profile data.
-   */
-  async function sendNFT(profile) {
-    if (!connectedAccount) {
-      showStatus('Please connect your wallet first!', false, profile._id);
+  async function saveWalletAddress(address) {
+    try {
+      const response = await fetch('/api/user/update-wallet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ walletAddress: address }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save wallet address');
+      }
+
+      const data = await response.json();
+      console.log(data.message);
+    } catch (error) {
+      console.error('Error saving wallet address:', error);
+    }
+  }
+
+  async function sendTokens(profile) {
+    if (!solanaPublicKey) {
+      showStatus('Please connect your Solana wallet first!', false, profile._id);
       return;
     }
 
-    const contractAddress = document.getElementById(`contractAddress-${profile._id}`).value;
-    const tokenId = document.getElementById(`tokenId-${profile._id}`).value;
-    const recipientAddress = profile._id; // Assuming profile._id is the recipient's address
+    const recipientAddress = document.getElementById(`recipientAddress-${profile._id}`).value;
+    const amount = parseFloat(document.getElementById(`tokenAmount-${profile._id}`).value);
 
-    if (!contractAddress || !tokenId) {
-      showStatus('Please fill in all fields!', false, profile._id);
+    if (!recipientAddress || isNaN(amount)) {
+      showStatus('Please fill in all fields with valid values!', false, profile._id);
       return;
     }
 
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-
-      // ERC721 ABI for transfer function
-      const abi = [
-        "function transferFrom(address from, address to, uint256 tokenId)"
-      ];
-
-      const nftContract = new ethers.Contract(contractAddress, abi, signer);
-
-      // Send transaction
-      const transaction = await nftContract.transferFrom(
-        connectedAccount,
-        recipientAddress,
-        tokenId
+      const transaction = new solanaWeb3.Transaction().add(
+        solanaWeb3.SystemProgram.transfer({
+          fromPubkey: solanaPublicKey,
+          toPubkey: new solanaWeb3.PublicKey(recipientAddress),
+          lamports: amount * solanaWeb3.LAMPORTS_PER_SOL,
+        })
       );
 
-      showStatus('Transaction sent! Waiting for confirmation...', true, profile._id);
+      const { blockhash } = await solanaConnection.getRecentBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = solanaPublicKey;
 
-      // Wait for transaction confirmation
-      const receipt = await transaction.wait();
-      showStatus(`NFT transferred successfully! Transaction hash: ${receipt.transactionHash}`, true, profile._id);
-
-      // Increase the NFT count
-      let currentCount = parseInt(localStorage.getItem(`nftCount-${profile._id}`), 10) || 0;
-      localStorage.setItem(`nftCount-${profile._id}`, currentCount + 1);
+      const signed = await window.solana.signTransaction(transaction);
+      const signature = await solanaConnection.sendRawTransaction(signed.serialize());
       
-      // Update the displayed count
-      updateNFTCountDisplay(profile._id);
+      await solanaConnection.confirmTransaction(signature);
+      
+      showStatus(`Solana transaction sent! Signature: ${signature}`, true, profile._id);
 
+      // Update token count on the server
+      await updateTokenCount(profile._id, amount);
     } catch (error) {
-      showStatus('Error sending NFT: ' + error.message, false, profile._id);
+      showStatus('Error sending Solana transaction: ' + error.message, false, profile._id);
     }
   }
 
-  /**
-   * Show a status message.
-   * @param {string} message - The status message.
-   * @param {boolean} isSuccess - Whether the status is a success or error.
-   * @param {string} id - The ID of the status element.
-   */
+  async function updateTokenCount(profileId, amount) {
+    try {
+      const response = await fetch('/api/user/update-tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ profileId, amount }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update token count');
+      }
+
+      const data = await response.json();
+      console.log(data.message);
+      
+      // Update the token count display
+      const tokenCountElement = document.getElementById(`tokenCount-${profileId}`);
+      if (tokenCountElement) {
+        tokenCountElement.textContent = data.user.tokenCount;
+      }
+    } catch (error) {
+      console.error('Error updating token count:', error);
+    }
+  }
+
   function showStatus(message, isSuccess, id) {
     const statusDiv = id === 'global' ? 
       document.getElementById('globalStatus') || createGlobalStatusDiv() :
@@ -265,10 +257,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
-  /**
-   * Create a global status div element.
-   * @returns {HTMLElement} - The global status div element.
-   */
   function createGlobalStatusDiv() {
     const globalStatus = document.createElement('div');
     globalStatus.id = 'globalStatus';
@@ -281,25 +269,30 @@ document.addEventListener("DOMContentLoaded", function() {
     return globalStatus;
   }
 
-  /**
-   * Initialize the NFT count for the specified profile.
-   * @param {string} profileId - The ID of the profile.
-   */
-  function initializeNFTCount(profileId) {
-    if (localStorage.getItem(`nftCount-${profileId}`) === null) {
-      localStorage.setItem(`nftCount-${profileId}`, 0);
+  async function requestAirdrop() {
+    if (!solanaPublicKey) {
+      showStatus('Please connect your Solana wallet first!', false, 'global');
+      return;
     }
-    updateNFTCountDisplay(profileId);
-  }
 
-  /**
-   * Update the displayed NFT count for the specified profile.
-   * @param {string} profileId - The ID of the profile.
-   */
-  function updateNFTCountDisplay(profileId) {
-    const nftCountElement = document.getElementById(`nftCount-${profileId}`);
-    if (nftCountElement) {
-      nftCountElement.textContent = localStorage.getItem(`nftCount-${profileId}`) || 0;
+    try {
+      const response = await fetch('/api/airdrop', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: 1 }), // Request 1 SOL
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to request airdrop');
+      }
+
+      const data = await response.json();
+      showStatus(`Airdrop successful! New balance: ${data.newBalance} SOL`, true, 'global');
+    } catch (error) {
+      showStatus('Error requesting airdrop: ' + error.message, false, 'global');
     }
   }
 
@@ -321,5 +314,25 @@ document.addEventListener("DOMContentLoaded", function() {
   const connectWalletButton = document.getElementById('connectWallet');
   if (connectWalletButton) {
     connectWalletButton.addEventListener('click', connectWallet);
+  }
+
+  // Airdrop button
+  const airdropButton = document.getElementById('requestAirdrop');
+  if (airdropButton) {
+    airdropButton.addEventListener('click', requestAirdrop);
+  }
+
+  function filterProfiles() {
+    const searchTerm = profileSearch.value.toLowerCase();
+    const activeCategory = document.querySelector('.category-btn.active').dataset.category;
+
+    const filteredProfiles = profiles.filter(profile => {
+      const matchesSearch = profile.name.toLowerCase().includes(searchTerm) ||
+                            profile.skills.some(skill => skill.toLowerCase().includes(searchTerm));
+      const matchesCategory = activeCategory === 'all' || profile.tier.toLowerCase() === activeCategory;
+      return matchesSearch && matchesCategory;
+    });
+
+    renderProfiles(filteredProfiles);
   }
 });
