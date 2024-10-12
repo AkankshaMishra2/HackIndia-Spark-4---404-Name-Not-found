@@ -1,3 +1,4 @@
+
 document.addEventListener("DOMContentLoaded", function() {
   // Add the ethers.js script
   const ethersScript = document.createElement('script');
@@ -35,6 +36,11 @@ document.addEventListener("DOMContentLoaded", function() {
   let profiles = [];
   let connectedAccount = null;
 
+
+
+  /*************************************** Fetch profiles from the server and render them.************************************/
+
+
   async function fetchProfiles() {
     try {
       const response = await fetch('/api/profiles', {
@@ -54,6 +60,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
+<<<<<<< HEAD
   // earlier at this place the code of the function createProfileCard was written, but i have moved it to the below so that I can work easily - Anushi
    function openChatWindow(userId) {
 
@@ -70,6 +77,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------
+=======
+ 
+
+  /*******************************************Create a profile card element for the given profile.********************************************************/
+
+  
+>>>>>>> e80572bd79f7d7ab8ec1e0844c61d07358172f3e
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';
@@ -113,6 +127,9 @@ document.addEventListener("DOMContentLoaded", function() {
     return card;
   }
 
+  /******************************************************* Render the given profiles in the profiles container.********************************************************/
+  
+  
   function renderProfiles(profilesToRender) {
     profilesContainer.innerHTML = '';
     profilesToRender.forEach(profile => {
@@ -120,20 +137,9 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  function filterProfiles() {
-    const searchTerm = profileSearch.value.toLowerCase();
-    const activeCategory = document.querySelector('.category-btn.active').dataset.category;
-    
-    const filteredProfiles = profiles.filter(profile => {
-      const matchesSearch = profile.name.toLowerCase().includes(searchTerm) || 
-                            profile.skills.some(skill => skill.toLowerCase().includes(searchTerm));
-      const matchesCategory = activeCategory === 'all' || profile.skills.some(skill => skill.toLowerCase().replace(/\s+/g, '-') === activeCategory);
-      return matchesSearch && matchesCategory;
-    });
-
-    renderProfiles(filteredProfiles);
-  }
-
+  
+  /*************************************************Handle sending NFT via Phospher**********************************************************************/
+  
   function handleSendNFTViaPhosphor(profile) {
     // Increase the NFT count
     let currentCount = parseInt(localStorage.getItem(`nftCount-${profile._id}`), 10) || 0;
@@ -146,15 +152,22 @@ document.addEventListener("DOMContentLoaded", function() {
     window.open('https://phosphor.xyz/', '_blank');
   }
 
+  /************************************************Handle sending NFT via MetaMask.**************************************************************/
+  
   function handleSendNFTViaMetaMask(profile) {
     const card = document.querySelector(`.profile-card[data-userid="${profile._id}"]`);
     const nftTransferForm = card.querySelector('.nft-transfer-form');
     nftTransferForm.style.display = nftTransferForm.style.display === 'none' ? 'block' : 'none';
   }
 
+  /********************************************************** Open the send token page.******************************************************************/
+  
   function openSendTokenPage(profileId) {
     window.open('SENDTOKENS.html', '_blank');
   }
+
+  /********************************************************************* Connect the user's wallet using MetaMask.*************************************/
+
 
   async function connectWallet() {
     if (typeof window.ethereum !== 'undefined') {
@@ -179,6 +192,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
+  /**
+   * Send an NFT to the specified profile.
+   * @param {Object} profile - The profile data.
+   */
   async function sendNFT(profile) {
     if (!connectedAccount) {
       showStatus('Please connect your wallet first!', false, profile._id);
@@ -230,6 +247,12 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
+  /**
+   * Show a status message.
+   * @param {string} message - The status message.
+   * @param {boolean} isSuccess - Whether the status is a success or error.
+   * @param {string} id - The ID of the status element.
+   */
   function showStatus(message, isSuccess, id) {
     const statusDiv = id === 'global' ? 
       document.getElementById('globalStatus') || createGlobalStatusDiv() :
@@ -246,6 +269,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
+  /**
+   * Create a global status div element.
+   * @returns {HTMLElement} - The global status div element.
+   */
   function createGlobalStatusDiv() {
     const globalStatus = document.createElement('div');
     globalStatus.id = 'globalStatus';
@@ -258,6 +285,10 @@ document.addEventListener("DOMContentLoaded", function() {
     return globalStatus;
   }
 
+  /**
+   * Initialize the NFT count for the specified profile.
+   * @param {string} profileId - The ID of the profile.
+   */
   function initializeNFTCount(profileId) {
     if (localStorage.getItem(`nftCount-${profileId}`) === null) {
       localStorage.setItem(`nftCount-${profileId}`, 0);
@@ -265,6 +296,10 @@ document.addEventListener("DOMContentLoaded", function() {
     updateNFTCountDisplay(profileId);
   }
 
+  /**
+   * Update the displayed NFT count for the specified profile.
+   * @param {string} profileId - The ID of the profile.
+   */
   function updateNFTCountDisplay(profileId) {
     const nftCountElement = document.getElementById(`nftCount-${profileId}`);
     if (nftCountElement) {
