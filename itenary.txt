@@ -1,0 +1,36 @@
+The root of the files is following
+├── frontend  (BY anuj -- HTML,css , JS)
+│   └── public
+│       ├── assets
+│       │   ├── CSS
+│       │   │   └── styles.css
+│       │   └── JS
+│       │       └── main.js (changes made by akanksha for fetch and post API's)
+│       ├── CSS
+│       │   └── styles.css
+│       ├── JS
+│       │   ├── login.js
+│       │   ├── profile-circle.js
+│       │   ├── profile-dropdown.js
+│       │   ├── profile.js
+│       │   └── signup.js
+|       |
+|       |──SENDTOKENS.HTML          (Rough not fully functional)
+│       ├── index.html              (landing page)
+│       ├── login.html
+│       ├── premiumdoc.html         
+│       ├── profile.html
+│       └── signup.html
+├── src                     (whole backend Here -- Done by akanksha)
+│   ├── config.js       (database connections)
+│   ├── index.js        (API creation,, routes definition)
+│   └── .env
+├── itenary.txt         (all beura of files)
+├── package-lock.json
+├── package.json        (all dependencies)
+└── README.md
+
+
+* dependencies u need to have are in package.json 
+
+

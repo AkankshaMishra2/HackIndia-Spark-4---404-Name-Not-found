@@ -1,4 +1,6 @@
 // login.js
+
+// Wait for the DOM to fully load before running the script
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
 
@@ -9,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const password = document.getElementById('password').value;
 
         try {
+            // Send a POST request to the login API endpoint with the email and password
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: {
@@ -17,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ email, password }),
                 credentials: 'include'
             });
-
+             // Parse the JSON response from the server
             const data = await response.json();
 
             if (response.ok) {
