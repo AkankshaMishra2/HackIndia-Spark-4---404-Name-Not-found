@@ -94,6 +94,24 @@ document.addEventListener("DOMContentLoaded", function() {
     return card;
   }
 
+
+  /******************************************************* Chat App Code - Anushi ********************************************************/
+  function openChatWindow(userId) {
+     // Open a new window to the realtime chat server, passing the userId as a query parameter
+     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
+    
+     if (chatWindow) {
+         chatWindow.focus();
+     } else {
+         alert('Please allow popups for this website to use the chat feature.');
+     }
+}
+
+
+
+  /******************************************************* Render the given profiles in the profiles container.********************************************************/
+  
+  
   function renderProfiles(profilesToRender) {
     profilesContainer.innerHTML = '';
     profilesToRender.forEach(profile => {
