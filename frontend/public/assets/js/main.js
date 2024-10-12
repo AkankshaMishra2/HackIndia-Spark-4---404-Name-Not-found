@@ -54,31 +54,22 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
-  async function openChatWindow(mentorId) {
-      try {
-        const response = await fetch(`/chat?mentor=${mentorId}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-  
-        if (response.ok) {
-          const chatWindow = window.open(`/chat?mentor=${mentorId}`, 'ChatWindow', 'width=400,height=600');
-          if (chatWindow) {
-            chatWindow.focus();
-          } else {
-            alert('Please allow popups for this website to use the chat feature.');
-          }
-        } else if (response.status === 401) {
-          alert('Please log in to use the chat feature.');
-        } else {
-          throw new Error('Failed to open chat window');
-        }
-      } catch (error) {
-        console.error('Error opening chat window:', error);
-        alert('An error occurred while trying to open the chat window. Please try again later.');
-      }
-  }
+  // earlier at this place the code of the function createProfileCard was written, but i have moved it to the below so that I can work easily - Anushi
+   function openChatWindow(userId) {
 
+     // Open a new window to the realtime chat server, passing the userId as a query parameter
+     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
+    
+     if (chatWindow) {
+         chatWindow.focus();
+     } else {
+         alert('Please allow popups for this website to use the chat feature.');
+     }
+}
+
+
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------------------
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';

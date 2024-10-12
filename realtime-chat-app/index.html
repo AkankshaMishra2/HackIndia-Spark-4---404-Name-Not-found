@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #messages {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        #messages li {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 4px;
+            max-width: 60%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #messages .sent {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+        #messages .received {
+            background-color: white;
+            align-self: flex-start;
+        }
+        #chatForm {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+        #message {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Timer styling */
+        #timer {
+            text-align: right;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: red; /* Red color for the timer */
+            margin-right: 2%;
+        }
+
+        /* Time Over message styling */
+        #timeOverMessage {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: red;
+            display: none; /* Hidden initially */
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const input = document.getElementById('message');
+            const form = document.getElementById('chatForm');
+            const timerDisplay = document.getElementById('timer');
+            const timeOverMessage = document.getElementById('timeOverMessage');
+            let timeLeft = 10 * 60; // 10 minutes in seconds
+
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const msg = input.value;
+                socket.emit('message', msg); // Send message to server
+                addMessage(msg, 'sent');
+                input.value = '';
+            });
+
+            // Listen for messages from the server
+            socket.on('message', (msg) => {
+                addMessage(msg, 'received');
+            });
+
+            function addMessage(msg, type) {
+                const messages = document.getElementById('messages');
+                const messageElem = document.createElement('li');
+                messageElem.textContent = msg;
+                messageElem.classList.add(type);
+                messages.appendChild(messageElem);
+                messages.scrollTop = messages.scrollHeight; // Scroll to the bottom
+            }
+
+            // Timer countdown function
+            function startTimer() {
+                let timerInterval = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        let minutes = Math.floor(timeLeft / 60);
+                        let seconds = timeLeft % 60;
+                        seconds = seconds < 10 ? '0' + seconds : seconds; // Format seconds
+                        timerDisplay.innerText = `Time Left: ${minutes}:${seconds}`;
+                    } else {
+                        clearInterval(timerInterval);
+                        timerDisplay.style.display = 'none'; // Hide the timer
+                        timeOverMessage.style.display = 'block'; // Show time over message
+                    }
+                }, 1000);
+            }
+
+            // Start the countdown timer when the page loads
+            startTimer();
+        });
+    </script>
+</head>
+<body>
+    <!-- Timer display -->
+    <div id="timer">Time Left: 10:00</div>
+
+    <!-- Time over message (hidden initially) -->
+    <div id="timeOverMessage">Time Over! Get your GCs in the wallet!</div>
+    
+    <!-- Message list -->
+    <ul id="messages"></ul>
+
+    <!-- Chat form -->
+    <form id="chatForm">
+        <input id="message" autocomplete="off" /><button>Send</button>
+    </form>
+</body>
+</html>
