@@ -10,6 +10,7 @@ const session = require('express-session');
 const { connectDB, User, Message } = require('./config');
 const http = require('http');
 const socketIO = require('socket.io');
+const { Connection, PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } = require('@solana/web3.js');
 
 // Create Express app
 const app = express();
@@ -59,7 +60,6 @@ const isAuthenticated = (req, res, next) => {
     }
 };
 
-
 // API routes
 
 // Signup route
@@ -84,7 +84,8 @@ app.post("/api/signup", async (req, res) => {
             bio,
             status,
             college,
-            tier: 'copper', // Set default tier to copper
+            tier: 'copper',
+            tokenCount: 0,
         });
 
         await newUser.save();
@@ -163,8 +164,9 @@ app.get("/api/user/profile", isAuthenticated, async (req, res) => {
                 bio: user.bio,
                 status: user.status,
                 college: user.college,
-                tier: user.tier || 'copper',
-                wallet: user.wallet
+                tier: user.tier,
+                walletAddress: user.walletAddress,
+                tokenCount: user.tokenCount
             }
         });
     } catch (error) {
@@ -176,7 +178,7 @@ app.get("/api/user/profile", isAuthenticated, async (req, res) => {
 // Get all profiles
 app.get("/api/profiles", async (req, res) => {
     try {
-        const profiles = await User.find({}, 'name email skills experience bio status college tier');
+        const profiles = await User.find({}, 'name email skills experience bio status college tier tokenCount');
         res.json(profiles);
     } catch (error) {
         console.error('Error fetching profiles:', error);
@@ -210,7 +212,8 @@ app.put("/api/user/update", isAuthenticated, async (req, res) => {
                 status: user.status,
                 college: user.college,
                 tier: user.tier,
-                wallet: user.wallet
+                walletAddress: user.walletAddress,
+                tokenCount: user.tokenCount
             }
         });
     } catch (error) {
@@ -219,17 +222,172 @@ app.put("/api/user/update", isAuthenticated, async (req, res) => {
     }
 });
 
-
-// Catch-all route to serve the frontend for any other requests
-app.get('*', (req, res) => {
-    const indexPath = path.join(__dirname, '../frontend/public', 'index.html');
-    console.log('Serving index.html from:', indexPath);
-    res.sendFile(indexPath);
+// Check login status
+app.get("/api/user/check-login", (req, res) => {
+    if (req.session && req.session.userId) {
+        res.json({ isLoggedIn: true });
+    } else {
+        res.json({ isLoggedIn: false });
+    }
 });
 
-// Error handling middleware (should be at the bottom)
+// Update user's wallet address
+app.post('/api/user/update-wallet', isAuthenticated, async (req, res) => {
+    const { walletAddress } = req.body;
+    try {
+        const user = await User.findByIdAndUpdate(
+            req.session.userId,
+            { walletAddress },
+            { new: true }
+        );
+        res.json({ message: 'Wallet address updated successfully', user });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// Update user's token count
+app.post("/api/user/update-tokens", isAuthenticated, async (req, res) => {
+    const { profileId, amount } = req.body;
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            profileId,
+            { $inc: { tokenCount: amount } },
+            { new: true, runValidators: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const newTier = calculateTier(user.tokenCount);
+        if (newTier !== user.tier) {
+            user.tier = newTier;
+            await user.save();
+        }
+
+        res.json({
+            message: "Token count updated successfully",
+            user: {
+                name: user.name,
+                email: user.email,
+                tokenCount: user.tokenCount,
+                tier: user.tier
+            }
+        });
+    } catch (error) {
+        console.error('Error updating token count:', error);
+        res.status(500).json({ message: "Error updating token count", error: error.message });
+    }
+});
+
+function calculateTier(tokenCount) {
+    if (tokenCount >= 1000) return 'legendary';
+    if (tokenCount >= 500) return 'titanium';
+    if (tokenCount >= 250) return 'platinum';
+    if (tokenCount >= 100) return 'gold';
+    if (tokenCount >= 50) return 'silver';
+    if (tokenCount >= 25) return 'bronze';
+    return 'copper';
+}
+
+// Airdrop tokens to a user
+app.post("/api/airdrop", isAuthenticated, async (req, res) => {
+    const { amount } = req.body;
+
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user || !user.walletAddress) {
+            return res.status(400).json({ message: "User not found or wallet not connected" });
+        }
+
+        const connection = new Connection("https://api.devnet.solana.com");
+        const publicKey = new PublicKey(user.walletAddress);
+
+        const signature = await connection.requestAirdrop(publicKey, amount * LAMPORTS_PER_SOL);
+        await connection.confirmTransaction(signature);
+
+        user.tokenCount += parseFloat(amount);
+        await user.save();
+
+        const newTier = calculateTier(user.tokenCount);
+        if (newTier !== user.tier) {
+            user.tier = newTier;
+            await user.save();
+        }
+
+        res.json({
+            message: "Airdrop successful",
+            signature,
+            newBalance: user.tokenCount,
+            newTier: user.tier
+        });
+    } catch (error) {
+        console.error('Airdrop error:', error);
+        res.status(500).json({ message: "Error during airdrop", error: error.message });
+    }
+});
+
+// Send tokens
+app.post("/api/send-tokens", isAuthenticated, async (req, res) => {
+    const { amount, recipientAddress } = req.body;
+
+    try {
+        const sender = await User.findById(req.session.userId);
+        if (!sender || !sender.walletAddress) {
+            return res.status(400).json({ message: "Sender not found or wallet not connected" });
+        }
+
+        const connection = new Connection("https://api.devnet.solana.com");
+        const senderPublicKey = new PublicKey(sender.walletAddress);
+        const recipientPublicKey = new PublicKey(recipientAddress);
+
+        const transaction = new Transaction().add(
+            SystemProgram.transfer({
+                fromPubkey: senderPublicKey,
+                toPubkey: recipientPublicKey,
+                lamports: amount * LAMPORTS_PER_SOL
+            })
+        );
+
+        // Get the latest blockhash
+        const { blockhash } = await connection.getRecentBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = senderPublicKey;
+
+        // Sign the transaction (this should be done client-side in a real application)
+        // For demonstration purposes, we're using a dummy private key here
+        // In a real application, the user would sign this with their wallet
+        const dummyPrivateKey = "dummy_private_key";
+        const signedTransaction = await Transaction.sign([dummyPrivateKey], transaction);
+
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        await connection.confirmTransaction(signature);
+
+        // Update sender's token count
+        sender.tokenCount -= parseFloat(amount);
+        await sender.save();
+
+        res.json({
+            message: "Tokens sent successfully",
+            signature,
+            newBalance: sender.tokenCount
+        });
+    } catch (error) {
+        console.error('Error sending tokens:', error);
+        res.status(500).json({ message: "Error sending tokens", error: error.message });
+    }
+});
+
+// Catch-all route to serve the frontend
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/public', 'index.html'));
+});
+
+// Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error(`${new Date().toISOString()} - Error:`, err);
     res.status(500).send('Something broke!');
 });
 

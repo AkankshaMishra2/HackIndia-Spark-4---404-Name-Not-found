@@ -2,6 +2,9 @@ document.addEventListener("DOMContentLoaded", function() {
   // Add the Solana Web3.js script
   const solanaScript = document.createElement('script');
   solanaScript.src = 'https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js';
+  solanaScript.onload = function() {
+    window.Buffer = solanaWeb3.Buffer;
+  };
   document.head.appendChild(solanaScript);
 
   // Navigation menu toggle
@@ -9,22 +12,22 @@ document.addEventListener("DOMContentLoaded", function() {
   const navToggle = document.getElementById("nav-toggle");
 
   if (navToggle) {
-      navToggle.addEventListener("click", () => {
-          navMenu.classList.toggle("show-menu");
-      });
+    navToggle.addEventListener("click", () => {
+      navMenu.classList.toggle("show-menu");
+    });
   }
 
   // Smooth scrolling for anchor links
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function (e) {
-          e.preventDefault();
-          const target = document.querySelector(this.getAttribute('href'));
-          if (target) {
-              target.scrollIntoView({
-                  behavior: 'smooth'
-              });
-          }
-      });
+    anchor.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({
+          behavior: 'smooth'
+        });
+      }
+    });
   });
 
   // Profile rendering and filtering
@@ -35,6 +38,50 @@ document.addEventListener("DOMContentLoaded", function() {
   let profiles = [];
   let solanaConnection;
   let walletPublicKey;
+  let isLoggedIn = false;
+
+  async function checkLoginStatus() {
+    try {
+      const response = await fetch('/api/user/check-login', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        isLoggedIn = data.isLoggedIn;
+        updateUIForLoginStatus();
+      } else {
+        console.error('Failed to check login status');
+      }
+    } catch (error) {
+      console.error('Error checking login status:', error);
+    }
+  }
+
+  function updateUIForLoginStatus() {
+    const connectWalletButton = document.getElementById('connectWallet');
+    const loginButton = document.getElementById('loginButton');
+    const logoutButton = document.getElementById('logoutButton');
+
+    if (isLoggedIn) {
+      if (connectWalletButton) connectWalletButton.style.display = 'block';
+      if (loginButton) loginButton.style.display = 'none';
+      if (logoutButton) logoutButton.style.display = 'block';
+    } else {
+      if (connectWalletButton) connectWalletButton.style.display = 'none';
+      if (loginButton) loginButton.style.display = 'block';
+      if (logoutButton) logoutButton.style.display = 'none';
+    }
+
+    // Update profile cards
+    document.querySelectorAll('.profile-card').forEach(card => {
+      const sendTokensButton = card.querySelector('.btn-send-tokens');
+      if (sendTokensButton) {
+        sendTokensButton.disabled = !isLoggedIn;
+      }
+    });
+  }
 
   async function fetchProfiles() {
     try {
@@ -58,7 +105,7 @@ document.addEventListener("DOMContentLoaded", function() {
   function createProfileCard(profile) {
     const card = document.createElement('div');
     card.className = 'profile-card';
-    card.dataset.userid = profile._id;  // Add this line
+    card.dataset.userid = profile._id;
     card.innerHTML = `
       <img src="${profile.image || '/placeholder.svg?height=100&width=100'}" alt="${profile.name}" class="profile-image">
       <h3>${profile.name}</h3>
@@ -68,7 +115,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <p class="token-count">Token Count: <span id="tokenCount-${profile._id}">${profile.tokenCount || 0}</span></p>
       <div class="profile-actions">
         <button class="btn btn-message" data-userid="${profile._id}">Message</button>
-        <button class="btn btn-send-tokens" data-userid="${profile._id}">Send Tokens</button>
+        <button class="btn btn-send-tokens" data-userid="${profile._id}" ${isLoggedIn ? '' : 'disabled'}>Send Tokens</button>
       </div>
       <div class="token-transfer-form" style="display: none;">
         <div class="input-group">
@@ -85,55 +132,26 @@ document.addEventListener("DOMContentLoaded", function() {
       <div class="status" id="status-${profile._id}" style="display: none;"></div>
     `;
 
-    // Add event listeners to the buttons
-    // card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
-    // card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
-    // card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
-    // card.querySelector('.btn-request-airdrop').addEventListener('click', () => requestAirdrop(profile._id));
-
-
-    const messageButton = card.querySelector('.btn-message');
-    const sendTokensButton = card.querySelector('.btn-send-tokens');
-
-    if (!isUserLoggedIn()) {
-      messageButton.addEventListener('click', () => showLoginPopup());
-      sendTokensButton.addEventListener('click', () => showLoginPopup());
-    } else {
-      messageButton.addEventListener('click', () => openChatWindow(profile._id));
-      sendTokensButton.addEventListener('click', () => toggleTokenTransferForm(profile._id));
-    }
-
+    card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
+    card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
     card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
     card.querySelector('.btn-request-airdrop').addEventListener('click', () => requestAirdrop(profile._id));
 
     return card;
   }
-  function isUserLoggedIn() {
-    // Implement your logic to check if the user is logged in
-    // For example, check if a user token exists in localStorage or cookies
-    return !!localStorage.getItem('userToken');
-}
-function showLoginPopup() {
-  alert('Please login to access this feature.');
-}
+
 
   /******************************************************* Chat App Code - Anushi ********************************************************/
   function openChatWindow(userId) {
-     // Open a new window to the realtime chat server, passing the userId as a query parameter
-     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
+    const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
     
-     if (chatWindow) {
-         chatWindow.focus();
-     } else {
-         alert('Please allow popups for this website to use the chat feature.');
-     }
-}
+    if (chatWindow) {
+      chatWindow.focus();
+    } else {
+      alert('Please allow popups for this website to use the chat feature.');
+    }
+  }
 
-
-
-  /******************************************************* Render the given profiles in the profiles container.********************************************************/
-  
-  
   function renderProfiles(profilesToRender) {
     const fragment = document.createDocumentFragment();
     profilesToRender.forEach(profile => {
@@ -145,6 +163,11 @@ function showLoginPopup() {
 
 
   function toggleTokenTransferForm(profileId) {
+    if (!isLoggedIn) {
+      showStatus('Please log in to send tokens.', false, 'global');
+      return;
+    }
+
     const card = document.querySelector(`.profile-card[data-userid="${profileId}"]`);
     if (card) {
       const tokenTransferForm = card.querySelector('.token-transfer-form');
@@ -166,46 +189,28 @@ function showLoginPopup() {
   //   // Implement chat window opening logic
   //   console.log(`Opening chat window for profile: ${profileId}`);
   // }
-// Example loading indicator
-function showLoadingIndicator() {
-  const loadingIndicator = document.createElement('div');
-  loadingIndicator.id = 'loading';
-  loadingIndicator.textContent = 'Loading...';
-  document.body.appendChild(loadingIndicator);
-}
-
-function hideLoadingIndicator() {
-  const loadingIndicator = document.getElementById('loading');
-  if (loadingIndicator) {
-      document.body.removeChild(loadingIndicator);
-  }
-}
-
-
-
-
-
-
-  /******************************************************* WEB-3 starts here ********************************************************/
 
   async function connectWallet() {
-    if ('solana' in window) {
+    if (!isLoggedIn) {
+      showStatus('Please log in to connect your wallet.', false, 'global');
+      return;
+    }
+  
+    if ('solana' in window && 'solanaWeb3' in window) {
       try {
         const resp = await window.solana.connect();
         walletPublicKey = resp.publicKey;
-        solanaConnection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+        solanaConnection = new window.solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
         showStatus(`Solana wallet connected: ${walletPublicKey.toString().substring(0,6)}...${walletPublicKey.toString().substring(38)}`, true, 'global');
         
-        // Save wallet address to user profile
         await saveWalletAddress(walletPublicKey.toString());
-
-        // Update UI to show connected state
+  
         updateWalletUI();
       } catch (error) {
         showStatus('Error connecting Solana wallet: ' + error.message, false, 'global');
       }
     } else {
-      showStatus('Please install Phantom wallet!', false, 'global');
+      showStatus('Please install Phantom wallet and refresh the page!', false, 'global');
     }
   }
 
@@ -232,70 +237,66 @@ function hideLoadingIndicator() {
   }
 
   async function sendTokens(profile) {
-    // Check if the wallet is connected
-    if (!walletPublicKey) {
-        showStatus('Please connect your Solana wallet first!', false, profile._id);
-        return;
+    if (!isLoggedIn || !walletPublicKey) {
+      showStatus('Please log in and connect your Solana wallet first!', false, profile._id);
+      return;
     }
-
-    // Get recipient address and amount from the input fields
+  
     const recipientAddress = document.getElementById(`recipientAddress-${profile._id}`).value;
     const amount = parseFloat(document.getElementById(`tokenAmount-${profile._id}`).value);
-
-    // Validate inputs
+  
     if (!recipientAddress || isNaN(amount)) {
         showStatus('Please fill in all fields with valid values!', false, profile._id);
         return;
     }
-
-    // Validate the recipient address
-    if (!solanaWeb3.PublicKey.isOnCurve(recipientAddress)) {
-        showStatus('Invalid recipient address!', false, profile._id);
-        return;
-    }
-
-    // Show loading indicator while processing the transaction
-    showLoadingIndicator();  
+  
     try {
-        // Create a transaction to transfer tokens
-        const transaction = new solanaWeb3.Transaction().add(
-            solanaWeb3.SystemProgram.transfer({
-                fromPubkey: walletPublicKey,
-                toPubkey: new solanaWeb3.PublicKey(recipientAddress),
-                lamports: amount * solanaWeb3.LAMPORTS_PER_SOL,
-            })
-        );
-
-        // Get recent blockhash and set it for the transaction
-        const { blockhash } = await solanaConnection.getRecentBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = walletPublicKey;
-
-        // Sign the transaction
-        const signed = await window.solana.signTransaction(transaction);
-        
-        // Send the transaction
-        const signature = await solanaConnection.sendRawTransaction(signed.serialize());
-
-        // Confirm the transaction
-        await solanaConnection.confirmTransaction(signature);
-
-        // Show success message with the transaction signature
-        showStatus(`Solana transaction sent! Signature: ${signature}`, true, profile._id);
-        
-        // Update token count on the server
-        await updateTokenCount(profile._id, amount);
+      console.log('Wallet Public Key:', walletPublicKey.toString());
+      console.log('Recipient Address:', recipientAddress);
+      console.log('Amount:', amount);
+  
+      // Ensure the connection is established
+      if (!solanaConnection) {
+        solanaConnection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      }
+  
+      // Create a new transaction
+      const transaction = new solanaWeb3.Transaction();
+  
+      // Add the transfer instruction
+      transaction.add(
+        solanaWeb3.SystemProgram.transfer({
+          fromPubkey: walletPublicKey,
+          toPubkey: new solanaWeb3.PublicKey(recipientAddress),
+          lamports: solanaWeb3.LAMPORTS_PER_SOL * amount,
+        })
+      );
+  
+      // Get the recent blockhash
+      const { blockhash } = await solanaConnection.getRecentBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = walletPublicKey;
+  
+      console.log('Transaction created:', transaction);
+  
+      // Sign and send the transaction
+      const signed = await window.solana.signAndSendTransaction(transaction);
+      console.log('Transaction sent, signature:', signed.signature);
+      
+      // Confirm the transaction
+      const confirmation = await solanaConnection.confirmTransaction(signed.signature);
+      console.log('Transaction confirmed:', confirmation);
+      
+      showStatus(`Solana transaction sent! Signature: ${signed.signature}`, true, profile._id);
+  
+      // Update token count on the server
+      await updateTokenCount(profile._id, -amount); // Deduct the sent amount
     } catch (error) {
-        // Handle any errors during the transaction
-        showStatus('Error sending Solana transaction: ' + error.message, false, profile._id);
-    } finally {
-        // Hide loading indicator after the transaction is processed
-        hideLoadingIndicator();  
+      console.error('Error details:', error);
+      showStatus('Error sending Solana transaction: ' + error.message, false, profile._id);
     }
-}
-
-
-
+  }
+  
   async function updateTokenCount(profileId, amount) {
     try {
       const response = await fetch('/api/user/update-tokens', {
@@ -353,6 +354,11 @@ function hideLoadingIndicator() {
   }
 
   async function requestAirdrop(profileId) {
+    if (!isLoggedIn) {
+      showStatus('Please log in to request an airdrop.', false, 'global');
+      return;
+    }
+
     if (!walletPublicKey) {
       showStatus('Please connect your Solana wallet first!', false, profileId);
       return;
@@ -382,7 +388,8 @@ function hideLoadingIndicator() {
     }
   }
 
-  // Initial fetch
+  // Initial fetch and setup
+  checkLoginStatus();
   fetchProfiles();
 
   // Event listeners
@@ -400,6 +407,38 @@ function hideLoadingIndicator() {
   const connectWalletButton = document.getElementById('connectWallet');
   if (connectWalletButton) {
     connectWalletButton.addEventListener('click', connectWallet);
+  }
+
+  // Login button
+  const loginButton = document.getElementById('loginButton');
+  if (loginButton) {
+    loginButton.addEventListener('click', () => {
+      window.location.href = '/login'; // Adjust this URL as needed
+    });
+  }
+
+  // Logout button
+  const logoutButton = document.getElementById('logoutButton');
+  if (logoutButton) {
+    logoutButton.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/user/logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          isLoggedIn = false;
+          updateUIForLoginStatus();
+          showStatus('Logged out successfully', true, 'global');
+        } else {
+          throw new Error('Logout failed');
+        }
+      } catch (error) {
+        console.error('Error during logout:', error);
+        showStatus('Logout failed. Please try again.', false, 'global');
+      }
+    });
   }
 
   function filterProfiles() {
