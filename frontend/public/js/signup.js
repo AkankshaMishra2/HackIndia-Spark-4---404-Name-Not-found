@@ -9,7 +9,10 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Convert skills to an array
         userData.skills = userData.skills.split(',').map(skill => skill.trim());
-        
+
+        // Optional: log user data for debugging
+        console.log('User Data:', userData);
+
         try {
             const response = await fetch('/api/signup', {
                 method: 'POST',
@@ -41,6 +44,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-
-// Anushi's work - web3
-
+/*
+Token Tier Grading Criteria:
+- Tier 1: 0-10 Tokens
+- Tier 2: 11-50 Tokens
+- Tier 3: 51-100 Tokens
+- Tier 4: 101+ Tokens
+*/

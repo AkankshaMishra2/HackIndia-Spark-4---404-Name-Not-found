@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function updateProfileUI(user) {
         document.getElementById('profileName').textContent = user.name || 'N/A';
         document.getElementById('profileEmail').textContent = user.email || 'N/A';
+        document.getElementById('profileWallet').textContent = user.wallet || 'N/A';
         document.getElementById('profileTier').textContent = user.tier || 'N/A';
         document.getElementById('profileSkills').textContent = user.skills ? user.skills.join(', ') : 'N/A';
         document.getElementById('profileExperience').textContent = user.experience || 'N/A';

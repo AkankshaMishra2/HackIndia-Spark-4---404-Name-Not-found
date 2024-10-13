@@ -305,6 +305,22 @@ function calculateTier(tokenCount) {
     return 'copper';
 }
 
+// WebSocket connection
+io.on('connection', (socket) => {
+    console.log('A user connected');
+
+    socket.on('send-message', (message) => {
+        io.emit('receive-message', message); // Broadcast message to all connected users
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected');
+    });
+});
+
+
+
+
 // Airdrop tokens to a user (for testing purposes)
 app.post("/api/airdrop", isAuthenticated, async (req, res) => {
     const { amount } = req.body;

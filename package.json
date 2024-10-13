@@ -8,6 +8,7 @@
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
+    "debug": "^4.3.4",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.4",
     "express": "^4.18.2",
@@ -15,8 +16,9 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.9.0",
-    "mongoose": "^8.7.0",
+    "mongoose": "^8.7.1",
     "punycode": "^2.3.1",
-    "socket.io": "^4.8.0"
+    "socket.io": "^4.8.0",
+    "whatwg-url": "^14.0.0"
   }
 }

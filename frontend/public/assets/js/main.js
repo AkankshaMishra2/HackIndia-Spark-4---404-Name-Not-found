@@ -86,14 +86,36 @@ document.addEventListener("DOMContentLoaded", function() {
     `;
 
     // Add event listeners to the buttons
-    card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
-    card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
+    // card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
+    // card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
+    // card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
+    // card.querySelector('.btn-request-airdrop').addEventListener('click', () => requestAirdrop(profile._id));
+
+
+    const messageButton = card.querySelector('.btn-message');
+    const sendTokensButton = card.querySelector('.btn-send-tokens');
+
+    if (!isUserLoggedIn()) {
+      messageButton.addEventListener('click', () => showLoginPopup());
+      sendTokensButton.addEventListener('click', () => showLoginPopup());
+    } else {
+      messageButton.addEventListener('click', () => openChatWindow(profile._id));
+      sendTokensButton.addEventListener('click', () => toggleTokenTransferForm(profile._id));
+    }
+
     card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
     card.querySelector('.btn-request-airdrop').addEventListener('click', () => requestAirdrop(profile._id));
 
     return card;
   }
-
+  function isUserLoggedIn() {
+    // Implement your logic to check if the user is logged in
+    // For example, check if a user token exists in localStorage or cookies
+    return !!localStorage.getItem('userToken');
+}
+function showLoginPopup() {
+  alert('Please login to access this feature.');
+}
 
   /******************************************************* Chat App Code - Anushi ********************************************************/
   function openChatWindow(userId) {
@@ -113,11 +135,14 @@ document.addEventListener("DOMContentLoaded", function() {
   
   
   function renderProfiles(profilesToRender) {
-    profilesContainer.innerHTML = '';
+    const fragment = document.createDocumentFragment();
     profilesToRender.forEach(profile => {
-      profilesContainer.appendChild(createProfileCard(profile));
+        fragment.appendChild(createProfileCard(profile));
     });
-  }
+    profilesContainer.innerHTML = '';
+    profilesContainer.appendChild(fragment);
+}
+
 
   function toggleTokenTransferForm(profileId) {
     const card = document.querySelector(`.profile-card[data-userid="${profileId}"]`);
@@ -141,6 +166,27 @@ document.addEventListener("DOMContentLoaded", function() {
   //   // Implement chat window opening logic
   //   console.log(`Opening chat window for profile: ${profileId}`);
   // }
+// Example loading indicator
+function showLoadingIndicator() {
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.id = 'loading';
+  loadingIndicator.textContent = 'Loading...';
+  document.body.appendChild(loadingIndicator);
+}
+
+function hideLoadingIndicator() {
+  const loadingIndicator = document.getElementById('loading');
+  if (loadingIndicator) {
+      document.body.removeChild(loadingIndicator);
+  }
+}
+
+
+
+
+
+
+  /******************************************************* WEB-3 starts here ********************************************************/
 
   async function connectWallet() {
     if ('solana' in window) {
@@ -186,45 +232,69 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   async function sendTokens(profile) {
+    // Check if the wallet is connected
     if (!walletPublicKey) {
-      showStatus('Please connect your Solana wallet first!', false, profile._id);
-      return;
+        showStatus('Please connect your Solana wallet first!', false, profile._id);
+        return;
     }
 
+    // Get recipient address and amount from the input fields
     const recipientAddress = document.getElementById(`recipientAddress-${profile._id}`).value;
     const amount = parseFloat(document.getElementById(`tokenAmount-${profile._id}`).value);
 
+    // Validate inputs
     if (!recipientAddress || isNaN(amount)) {
-      showStatus('Please fill in all fields with valid values!', false, profile._id);
-      return;
+        showStatus('Please fill in all fields with valid values!', false, profile._id);
+        return;
     }
 
+    // Validate the recipient address
+    if (!solanaWeb3.PublicKey.isOnCurve(recipientAddress)) {
+        showStatus('Invalid recipient address!', false, profile._id);
+        return;
+    }
+
+    // Show loading indicator while processing the transaction
+    showLoadingIndicator();  
     try {
-      const transaction = new solanaWeb3.Transaction().add(
-        solanaWeb3.SystemProgram.transfer({
-          fromPubkey: walletPublicKey,
-          toPubkey: new solanaWeb3.PublicKey(recipientAddress),
-          lamports: amount * solanaWeb3.LAMPORTS_PER_SOL,
-        })
-      );
+        // Create a transaction to transfer tokens
+        const transaction = new solanaWeb3.Transaction().add(
+            solanaWeb3.SystemProgram.transfer({
+                fromPubkey: walletPublicKey,
+                toPubkey: new solanaWeb3.PublicKey(recipientAddress),
+                lamports: amount * solanaWeb3.LAMPORTS_PER_SOL,
+            })
+        );
 
-      const { blockhash } = await solanaConnection.getRecentBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = walletPublicKey;
+        // Get recent blockhash and set it for the transaction
+        const { blockhash } = await solanaConnection.getRecentBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = walletPublicKey;
 
-      const signed = await window.solana.signTransaction(transaction);
-      const signature = await solanaConnection.sendRawTransaction(signed.serialize());
-      
-      await solanaConnection.confirmTransaction(signature);
-      
-      showStatus(`Solana transaction sent! Signature: ${signature}`, true, profile._id);
+        // Sign the transaction
+        const signed = await window.solana.signTransaction(transaction);
+        
+        // Send the transaction
+        const signature = await solanaConnection.sendRawTransaction(signed.serialize());
 
-      // Update token count on the server
-      await updateTokenCount(profile._id, amount);
+        // Confirm the transaction
+        await solanaConnection.confirmTransaction(signature);
+
+        // Show success message with the transaction signature
+        showStatus(`Solana transaction sent! Signature: ${signature}`, true, profile._id);
+        
+        // Update token count on the server
+        await updateTokenCount(profile._id, amount);
     } catch (error) {
-      showStatus('Error sending Solana transaction: ' + error.message, false, profile._id);
+        // Handle any errors during the transaction
+        showStatus('Error sending Solana transaction: ' + error.message, false, profile._id);
+    } finally {
+        // Hide loading indicator after the transaction is processed
+        hideLoadingIndicator();  
     }
-  }
+}
+
+
 
   async function updateTokenCount(profileId, amount) {
     try {
