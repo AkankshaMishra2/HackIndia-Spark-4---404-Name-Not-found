@@ -36,8 +36,7 @@ document.addEventListener("DOMContentLoaded", function() {
   const categoryButtons = document.querySelectorAll('.category-btn');
 
   let profiles = [];
-  let solanaConnection;
-  let walletPublicKey;
+  
   let isLoggedIn = false;
 
   async function checkLoginStatus() {
@@ -83,6 +82,14 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
+   // Update profile cards
+   document.querySelectorAll('.profile-card').forEach(card => {
+    const sendTokensButton = card.querySelector('.btn-send-tokens');
+    if (sendTokensButton) {
+      sendTokensButton.disabled = !isLoggedIn;
+    }
+  });
+
   async function fetchProfiles() {
     try {
       const response = await fetch('/api/profiles', {
@@ -117,30 +124,24 @@ document.addEventListener("DOMContentLoaded", function() {
         <button class="btn btn-message" data-userid="${profile._id}">Message</button>
         <button class="btn btn-send-tokens" data-userid="${profile._id}" ${isLoggedIn ? '' : 'disabled'}>Send Tokens</button>
       </div>
-      <div class="token-transfer-form" style="display: none;">
-        <div class="input-group">
-          <label for="recipientAddress-${profile._id}">Recipient Address:</label>
-          <input type="text" id="recipientAddress-${profile._id}" placeholder="Enter recipient address">
-        </div>
-        <div class="input-group">
-          <label for="tokenAmount-${profile._id}">Amount (SOL):</label>
-          <input type="number" id="tokenAmount-${profile._id}" placeholder="Enter amount to send">
-        </div>
-        <button class="btn btn-confirm-token-transfer" data-userid="${profile._id}">Confirm Token Transfer</button>
-        <button class="btn btn-request-airdrop" data-userid="${profile._id}" style="display: none;">Request Airdrop</button>
-      </div>
-      <div class="status" id="status-${profile._id}" style="display: none;"></div>
     `;
 
     card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
-    card.querySelector('.btn-send-tokens').addEventListener('click', () => toggleTokenTransferForm(profile._id));
-    card.querySelector('.btn-confirm-token-transfer').addEventListener('click', () => sendTokens(profile));
-    card.querySelector('.btn-request-airdrop').addEventListener('click', () => requestAirdrop(profile._id));
+    card.querySelector('.btn-send-tokens').addEventListener('click', () => openSolTransferApp(profile._id));
 
     return card;
   }
 
+////**** */
+function openSolTransferApp(profileId) {
+  if (!isLoggedIn) {
+    showStatus('Please log in to send tokens.', false, 'global');
+    return;
+  }
 
+  // Use Next.js routing to navigate to the SOL transfer page
+  window.location.href = `http://localhost:3001?profileId=${profileId}`;
+}
   /******************************************************* Chat App Code - Anushi ********************************************************/
   function openChatWindow(userId) {
     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
@@ -162,140 +163,14 @@ document.addEventListener("DOMContentLoaded", function() {
 }
 
 
-  function toggleTokenTransferForm(profileId) {
-    if (!isLoggedIn) {
-      showStatus('Please log in to send tokens.', false, 'global');
-      return;
-    }
+ 
 
-    const card = document.querySelector(`.profile-card[data-userid="${profileId}"]`);
-    if (card) {
-      const tokenTransferForm = card.querySelector('.token-transfer-form');
-      const airdropButton = card.querySelector('.btn-request-airdrop');
-      
-      if (tokenTransferForm && airdropButton) {
-        if (tokenTransferForm.style.display === 'none') {
-          tokenTransferForm.style.display = 'block';
-          airdropButton.style.display = 'block';
-        } else {
-          tokenTransferForm.style.display = 'none';
-          airdropButton.style.display = 'none';
-        }
-      }
-    }
+  function openChatWindow(profileId) {
+    // Implement chat window opening logic
+    console.log(`Opening chat window for profile: ${profileId}`);
   }
 
-  // function openChatWindow(profileId) {
-  //   // Implement chat window opening logic
-  //   console.log(`Opening chat window for profile: ${profileId}`);
-  // }
 
-  async function connectWallet() {
-    if (!isLoggedIn) {
-      showStatus('Please log in to connect your wallet.', false, 'global');
-      return;
-    }
-  
-    if ('solana' in window && 'solanaWeb3' in window) {
-      try {
-        const resp = await window.solana.connect();
-        walletPublicKey = resp.publicKey;
-        solanaConnection = new window.solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
-        showStatus(`Solana wallet connected: ${walletPublicKey.toString().substring(0,6)}...${walletPublicKey.toString().substring(38)}`, true, 'global');
-        
-        await saveWalletAddress(walletPublicKey.toString());
-  
-        updateWalletUI();
-      } catch (error) {
-        showStatus('Error connecting Solana wallet: ' + error.message, false, 'global');
-      }
-    } else {
-      showStatus('Please install Phantom wallet and refresh the page!', false, 'global');
-    }
-  }
-
-  async function saveWalletAddress(address) {
-    try {
-      const response = await fetch('/api/user/update-wallet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ walletAddress: address }),
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save wallet address');
-      }
-
-      const data = await response.json();
-      console.log(data.message);
-    } catch (error) {
-      console.error('Error saving wallet address:', error);
-    }
-  }
-
-  async function sendTokens(profile) {
-    if (!isLoggedIn || !walletPublicKey) {
-      showStatus('Please log in and connect your Solana wallet first!', false, profile._id);
-      return;
-    }
-  
-    const recipientAddress = document.getElementById(`recipientAddress-${profile._id}`).value;
-    const amount = parseFloat(document.getElementById(`tokenAmount-${profile._id}`).value);
-  
-    if (!recipientAddress || isNaN(amount)) {
-        showStatus('Please fill in all fields with valid values!', false, profile._id);
-        return;
-    }
-  
-    try {
-      console.log('Wallet Public Key:', walletPublicKey.toString());
-      console.log('Recipient Address:', recipientAddress);
-      console.log('Amount:', amount);
-  
-      // Ensure the connection is established
-      if (!solanaConnection) {
-        solanaConnection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
-      }
-  
-      // Create a new transaction
-      const transaction = new solanaWeb3.Transaction();
-  
-      // Add the transfer instruction
-      transaction.add(
-        solanaWeb3.SystemProgram.transfer({
-          fromPubkey: walletPublicKey,
-          toPubkey: new solanaWeb3.PublicKey(recipientAddress),
-          lamports: solanaWeb3.LAMPORTS_PER_SOL * amount,
-        })
-      );
-  
-      // Get the recent blockhash
-      const { blockhash } = await solanaConnection.getRecentBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = walletPublicKey;
-  
-      console.log('Transaction created:', transaction);
-  
-      // Sign and send the transaction
-      const signed = await window.solana.signAndSendTransaction(transaction);
-      console.log('Transaction sent, signature:', signed.signature);
-      
-      // Confirm the transaction
-      const confirmation = await solanaConnection.confirmTransaction(signed.signature);
-      console.log('Transaction confirmed:', confirmation);
-      
-      showStatus(`Solana transaction sent! Signature: ${signed.signature}`, true, profile._id);
-  
-      // Update token count on the server
-      await updateTokenCount(profile._id, -amount); // Deduct the sent amount
-    } catch (error) {
-      console.error('Error details:', error);
-      showStatus('Error sending Solana transaction: ' + error.message, false, profile._id);
-    }
-  }
   
   async function updateTokenCount(profileId, amount) {
     try {

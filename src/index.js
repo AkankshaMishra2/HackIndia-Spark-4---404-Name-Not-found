@@ -22,11 +22,19 @@ const port = process.env.PORT || 3000;
 // Connect to MongoDB
 connectDB().catch(err => console.error('Failed to connect to MongoDB:', err));
 
+
+// CORS configuration
+const corsOptions = {
+    origin: 'http://localhost:3001', // Allow requests from your frontend
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+    optionsSuccessStatus: 200
+  };
+  app.use(cors(corsOptions));  
+  
+
 // Middleware
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
-}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -38,7 +46,9 @@ app.use(session({
     cookie: { 
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: 'lax'
+        
     }
 }));
 
@@ -235,16 +245,27 @@ app.get("/api/user/check-login", (req, res) => {
 app.post('/api/user/update-wallet', isAuthenticated, async (req, res) => {
     const { walletAddress } = req.body;
     try {
+        if (!walletAddress) {
+            return res.status(400).json({ message: 'Wallet address is required' });
+        }
+
         const user = await User.findByIdAndUpdate(
             req.session.userId,
             { walletAddress },
             { new: true }
         );
-        res.json({ message: 'Wallet address updated successfully', user });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'Wallet address updated successfully', walletAddress: user.walletAddress });
     } catch (error) {
+        console.error('Error updating wallet address:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
+
 
 // Update user's token count
 app.post("/api/user/update-tokens", isAuthenticated, async (req, res) => {
@@ -345,9 +366,24 @@ app.post("/api/airdrop", isAuthenticated, async (req, res) => {
     }
 });
 
-// Send tokens
+// Fetch user's wallet address by profile ID
+app.get('/api/user/:profileId/wallet', async (req, res) => {
+    const { profileId } = req.params;
+
+    try {
+        const user = await User.findById(profileId);
+        if (!user || !user.walletAddress) {
+            return res.status(404).json({ message: 'User or wallet address not found' });
+        }
+        res.json({ walletAddress: user.walletAddress });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching wallet address', error: error.message });
+    }
+});
+
+// Send tokens (already exists in your `server.js`)
 app.post("/api/send-tokens", isAuthenticated, async (req, res) => {
-    const { amount, recipientAddress } = req.body;
+    const { amount, recipientAddress, profileId } = req.body;
 
     try {
         const sender = await User.findById(req.session.userId);
@@ -372,18 +408,23 @@ app.post("/api/send-tokens", isAuthenticated, async (req, res) => {
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = senderPublicKey;
 
-        // Sign the transaction (this should be done client-side in a real application)
-        // For demonstration purposes, we're using a dummy private key here
-        // In a real application, the user would sign this with their wallet
-        const dummyPrivateKey = "dummy_private_key";
-        const signedTransaction = await Transaction.sign([dummyPrivateKey], transaction);
+        const signedTransaction = await Transaction.sign([dummyPrivateKey], transaction); // Change signing here to user wallet
 
         const signature = await connection.sendRawTransaction(signedTransaction.serialize());
         await connection.confirmTransaction(signature);
 
-        // Update sender's token count
+        // Update sender's token count and save transaction details
         sender.tokenCount -= parseFloat(amount);
         await sender.save();
+
+        // Save transaction record in MongoDB (optional)
+        const newTransaction = new TransactionModel({
+            sender: req.session.userId,
+            recipient: profileId,
+            amount,
+            signature
+        });
+        await newTransaction.save();
 
         res.json({
             message: "Tokens sent successfully",
@@ -391,10 +432,10 @@ app.post("/api/send-tokens", isAuthenticated, async (req, res) => {
             newBalance: sender.tokenCount
         });
     } catch (error) {
-        console.error('Error sending tokens:', error);
         res.status(500).json({ message: "Error sending tokens", error: error.message });
     }
 });
+
 
 // Catch-all route to serve the frontend
 app.get('*', (req, res) => {
