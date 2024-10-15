@@ -36,7 +36,6 @@ document.addEventListener("DOMContentLoaded", function() {
   const categoryButtons = document.querySelectorAll('.category-btn');
 
   let profiles = [];
-  
   let isLoggedIn = false;
 
   async function checkLoginStatus() {
@@ -82,14 +81,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-   // Update profile cards
-   document.querySelectorAll('.profile-card').forEach(card => {
-    const sendTokensButton = card.querySelector('.btn-send-tokens');
-    if (sendTokensButton) {
-      sendTokensButton.disabled = !isLoggedIn;
-    }
-  });
-
   async function fetchProfiles() {
     try {
       const response = await fetch('/api/profiles', {
@@ -120,29 +111,52 @@ document.addEventListener("DOMContentLoaded", function() {
       <p>${profile.college || 'Not specified'}</p>
       <span class="tier ${profile.tier.toLowerCase()}">${profile.tier}</span>
       <p class="token-count">Token Count: <span id="tokenCount-${profile._id}">${profile.tokenCount || 0}</span></p>
+      
+      <!-- Wallet Address Section -->
+      <div class="wallet-address-section">
+        <p>Wallet Address: <span id="walletAddress-${profile._id}">${profile.walletAddress || 'null'}</span></p>
+        <button class="btn-copy" data-userid="${profile._id}" ${profile.walletAddress ? '' : 'disabled'}>Copy Wallet Address</button>
+      </div>
+      
       <div class="profile-actions">
         <button class="btn btn-message" data-userid="${profile._id}">Message</button>
         <button class="btn btn-send-tokens" data-userid="${profile._id}" ${isLoggedIn ? '' : 'disabled'}>Send Tokens</button>
       </div>
     `;
 
+    // Add event listeners for message and token send actions
     card.querySelector('.btn-message').addEventListener('click', () => openChatWindow(profile._id));
     card.querySelector('.btn-send-tokens').addEventListener('click', () => openSolTransferApp(profile._id));
+
+    // Add event listener for copying wallet address, only if wallet address exists
+    if (profile.walletAddress) {
+      card.querySelector('.btn-copy').addEventListener('click', () => copyToClipboard(profile.walletAddress));
+    }
 
     return card;
   }
 
-////**** */
-function openSolTransferApp(profileId) {
-  if (!isLoggedIn) {
-    showStatus('Please log in to send tokens.', false, 'global');
-    return;
+  // Function to copy wallet address to clipboard
+  function copyToClipboard(walletAddress) {
+    if (!walletAddress) {
+      console.error("No wallet address to copy.");
+      return;
+    }
+    navigator.clipboard.writeText(walletAddress)
+      .then(() => alert("Wallet address copied to clipboard!"))
+      .catch(err => console.error("Failed to copy wallet address: ", err));
   }
 
-  // Use Next.js routing to navigate to the SOL transfer page
-  window.location.href = `http://localhost:3001?profileId=${profileId}`;
-}
-  /******************************************************* Chat App Code - Anushi ********************************************************/
+  function openSolTransferApp(profileId) {
+    if (!isLoggedIn) {
+      showStatus('Please log in to send tokens.', false, 'global');
+      return;
+    }
+
+    // Use Next.js routing to navigate to the SOL transfer page
+    window.location.href = `http://localhost:3001?profileId=${profileId}`;
+  }
+
   function openChatWindow(userId) {
     const chatWindow = window.open(`http://localhost:4000/?userId=${userId}`, 'ChatWindow', 'width=400,height=600');
     
@@ -156,22 +170,12 @@ function openSolTransferApp(profileId) {
   function renderProfiles(profilesToRender) {
     const fragment = document.createDocumentFragment();
     profilesToRender.forEach(profile => {
-        fragment.appendChild(createProfileCard(profile));
+      fragment.appendChild(createProfileCard(profile));
     });
     profilesContainer.innerHTML = '';
     profilesContainer.appendChild(fragment);
-}
-
-
- 
-
-  function openChatWindow(profileId) {
-    // Implement chat window opening logic
-    console.log(`Opening chat window for profile: ${profileId}`);
   }
 
-
-  
   async function updateTokenCount(profileId, amount) {
     try {
       const response = await fetch('/api/user/update-tokens', {
@@ -243,95 +247,31 @@ function openSolTransferApp(profileId) {
       const signature = await solanaConnection.requestAirdrop(walletPublicKey, solanaWeb3.LAMPORTS_PER_SOL);
       await solanaConnection.confirmTransaction(signature);
       showStatus('Airdrop of 1 SOL successful!', true, profileId);
-      
-      // Update user's token count in the database
-      await updateTokenCount(profileId, 1);
     } catch (error) {
-      showStatus('Error requesting airdrop: ' + error.message, false, profileId);
+      console.error('Airdrop failed:', error);
+      showStatus('Airdrop failed. Please try again later.', false, profileId);
     }
   }
 
-  function updateWalletUI() {
-    const connectButton = document.getElementById('connectWallet');
-    
-    if (walletPublicKey) {
-      connectButton.textContent = `Connected: ${walletPublicKey.toString().substring(0,6)}...${walletPublicKey.toString().substring(38)}`;
-      connectButton.disabled = true;
-    } else {
-      connectButton.textContent = 'Connect Wallet';
-      connectButton.disabled = false;
-    }
-  }
+  profileSearch.addEventListener('input', function() {
+    const searchTerm = this.value.toLowerCase();
+    const filteredProfiles = profiles.filter(profile => 
+      profile.name.toLowerCase().includes(searchTerm) || 
+      profile.skills.some(skill => skill.toLowerCase().includes(searchTerm))
+    );
+    renderProfiles(filteredProfiles);
+  });
 
-  // Initial fetch and setup
-  checkLoginStatus();
-  fetchProfiles();
-
-  // Event listeners
-  profileSearch.addEventListener('input', filterProfiles);
-
+  // Event listener for category buttons
   categoryButtons.forEach(button => {
     button.addEventListener('click', function() {
-      categoryButtons.forEach(btn => btn.classList.remove('active'));
-      this.classList.add('active');
-      filterProfiles();
+      const category = this.dataset.category;
+      const filteredProfiles = profiles.filter(profile => profile.skills.includes(category));
+      renderProfiles(filteredProfiles);
     });
   });
 
-  // Connect wallet button
-  const connectWalletButton = document.getElementById('connectWallet');
-  if (connectWalletButton) {
-    connectWalletButton.addEventListener('click', connectWallet);
-  }
-
-  // Login button
-  const loginButton = document.getElementById('loginButton');
-  if (loginButton) {
-    loginButton.addEventListener('click', () => {
-      window.location.href = '/login'; // Adjust this URL as needed
-    });
-  }
-
-  // Logout button
-  const logoutButton = document.getElementById('logoutButton');
-  if (logoutButton) {
-    logoutButton.addEventListener('click', async () => {
-      try {
-        const response = await fetch('/api/user/logout', {
-          method: 'POST',
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          isLoggedIn = false;
-          updateUIForLoginStatus();
-          showStatus('Logged out successfully', true, 'global');
-        } else {
-          throw new Error('Logout failed');
-        }
-      } catch (error) {
-        console.error('Error during logout:', error);
-        showStatus('Logout failed. Please try again.', false, 'global');
-      }
-    });
-  }
-
-  function filterProfiles() {
-    const searchTerm = profileSearch.value.toLowerCase();
-    const activeCategory = document.querySelector('.category-btn.active').dataset.category;
-
-    const filteredProfiles = profiles.filter(profile => {
-      const matchesSearch = profile.name.toLowerCase().includes(searchTerm) ||
-                            profile.skills.some(skill => skill.toLowerCase().includes(searchTerm));
-      const matchesCategory = activeCategory === 'all' || profile.tier.toLowerCase() === activeCategory;
-      return matchesSearch && matchesCategory;
-    });
-
-    renderProfiles(filteredProfiles);
-  }
-
-  // Check if wallet is already connected
-  if (window.solana && window.solana.isConnected) {
-    connectWallet();
-  }
+  // Initial function calls
+  checkLoginStatus();
+  fetchProfiles();
 });

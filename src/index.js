@@ -74,7 +74,7 @@ const isAuthenticated = (req, res, next) => {
 
 // Signup route
 app.post("/api/signup", async (req, res) => {
-    const { name, password, email, skills, experience, bio, status, college } = req.body;
+    const { name, password, email, skills, experience, bio, status, college, walletAddress } = req.body;
 
     try {
         const existingUser = await User.findOne({ email });
@@ -95,6 +95,7 @@ app.post("/api/signup", async (req, res) => {
             status,
             college,
             tier: 'copper',
+            walletAddress: walletAddress || 'Null',
             tokenCount: 0,
         });
 
@@ -185,10 +186,19 @@ app.get("/api/user/profile", isAuthenticated, async (req, res) => {
     }
 });
 
-// Get all profiles
 app.get("/api/profiles", async (req, res) => {
+    const { category } = req.query; // Get category from query parameters
     try {
-        const profiles = await User.find({}, 'name email skills experience bio status college tier tokenCount');
+        let profiles;
+
+        if (category && category !== 'all') {
+            // Fetch profiles that match the selected category
+            profiles = await User.find({ skills: { $in: [category] } }, 'name email skills experience bio status college tier tokenCount walletAddress');
+        } else {
+            // Fetch all profiles if no category is selected
+            profiles = await User.find({}, 'name email skills experience bio status college tier tokenCount walletAddress');
+        }
+
         res.json(profiles);
     } catch (error) {
         console.error('Error fetching profiles:', error);
@@ -196,9 +206,10 @@ app.get("/api/profiles", async (req, res) => {
     }
 });
 
+
 // Update user data
 app.put("/api/user/update", isAuthenticated, async (req, res) => {
-    const { name, skills, experience, bio, status, college } = req.body;
+    const { name, skills, experience, bio, status, college, walletAddress } = req.body;
 
     try {
         const user = await User.findByIdAndUpdate(
