@@ -7,10 +7,12 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const session = require('express-session');
-const { connectDB, User, Message } = require('./config');
 const http = require('http');
 const socketIO = require('socket.io');
 const { Connection, PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } = require('@solana/web3.js');
+const bodyParser = require('body-parser');
+const { connectDB, User, Message, updateUserWalletAddress, getUserWalletAddress } = require('./config'); // Consolidated imports
+// const { connectDB, User, updateUserWalletAddress, getUserWalletAddress } = require('./config');
 
 // Create Express app
 const app = express();
@@ -29,10 +31,11 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 // Session middleware
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your_session_secret',
+    secret: process.env.SESSION_SECRET || 'your_secret',
     resave: false,
     saveUninitialized: false,
     cookie: { 
@@ -231,18 +234,37 @@ app.get("/api/user/check-login", (req, res) => {
     }
 });
 
+
 // Update user's wallet address
 app.post('/api/user/update-wallet', isAuthenticated, async (req, res) => {
     const { walletAddress } = req.body;
+    
+    if (!walletAddress) {
+      return res.status(400).json({ message: 'Wallet address is required' });
+    }
+  
     try {
-        const user = await User.findByIdAndUpdate(
-            req.session.userId,
-            { walletAddress },
-            { new: true }
-        );
-        res.json({ message: 'Wallet address updated successfully', user });
+      await updateUserWalletAddress(req.session.userId, walletAddress);
+      res.json({ message: 'Wallet address updated successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+      console.error('Error updating wallet address:', error);
+      res.status(500).json({ message: 'Failed to update wallet address', error: error.message });
+    }
+  });
+
+// Get user's wallet address
+app.get('/api/user/:userId/wallet-address', async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const walletAddress = await getUserWalletAddress(userId);
+        if (!walletAddress) {
+            return res.status(404).json({ error: 'Wallet address not found' });
+        }
+        res.json({ walletAddress });
+    } catch (error) {
+        console.error('Error fetching wallet address:', error);
+        res.status(500).json({ error: 'Failed to fetch wallet address' });
     }
 });
 
@@ -304,9 +326,6 @@ io.on('connection', (socket) => {
         console.log('User disconnected');
     });
 });
-
-
-
 
 // Airdrop tokens to a user
 app.post("/api/airdrop", isAuthenticated, async (req, res) => {
